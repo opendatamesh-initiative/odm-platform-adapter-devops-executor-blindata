@@ -31,6 +31,8 @@ interfaceComponents:
               databaseSchemaName: sales                   # schema (BigQuery: dataset)
               tables:
                 - name: orders
+                  specification: json-schema               # read by the ODCS plugin
+                  specificationVersion: "1"
                   definition:
                     name: orders
                     quality:                              # table-level rules
@@ -47,7 +49,30 @@ interfaceComponents:
                             mustBe: 0
 ```
 
-Every port of the descriptor is read; ports without `x-blindataConnectionName` are reported as skipped. The datastore API `definition` may be inline or a JSON string, and internal `$ref`s are resolved.
+Every port of the descriptor is read; ports without `x-blindataConnectionName` are reported as skipped. Tables must declare `specification: json-schema` with a 1.x `specificationVersion`, as the Blindata Builder writes them; a table of another specification that has `quality` rules is reported as not read. The descriptor is read as the Registry stores it: references to other files must already be resolved at publication.
+
+## How the contract is read
+
+The executor uses the ODM **descriptor parser library** (`odm-specification-dpdescriptor-parser`) and plugs an **ODCS plugin** into it:
+
+```mermaid
+flowchart LR
+  J[Descriptor JSON<br/>from the Registry] --> P[Descriptor parser]
+  P -->|datastoreapi 1.x| DS[DataStoreApiDefinitionConverter<br/>library]
+  DS -->|json-schema 1.x tables| O[OdcsTableDefinitionConverter<br/>ODCS plugin]
+  O --> M[Parsed model<br/>DataProductVersion → Port → DataStoreApi → OdcsTableDefinition]
+  M --> V[Visitors]
+  V --> R[Contract rules]
+```
+
+| Piece | Role |
+|:--|:--|
+| `Parser` (library) | Parses the descriptor into the DPDS model (`DataProductVersion`, ports, promises) |
+| `DataStoreApiDefinitionConverter` (library) | Turns each port's `datastoreapi` definition into a `DataStoreApi` |
+| `OdcsTableDefinitionConverter` (this executor, plugin) | A `DataStoreApiStandardDefinitionConverter` registered on the datastore API parser: turns each `json-schema` 1.x table definition into an `OdcsTableDefinition` with its table and column `quality` rules (`OdcsQualityRule`), keeping every ODCS key as written |
+| Visitors (this executor) | Walk the model with the library's visitor interfaces: `DataProductVersionVisitor` (info, ports) → `InterfaceComponentsVisitor` / `PortVisitor` / `PromisesVisitor` (connection name, API) → `StandardDefinitionVisitor<DataStoreApi>` and `DataStoreApiVisitor` / `DataStoreApiSchemaVisitor` (schema, tables) → `ComponentBaseVisitor<OdcsTableDefinition>` (rules) |
+| `ContractRulesCollector` | Applies the mapping to each rule met: check code, binding, blocking flag, skip reasons |
+
 
 ## Supported ODCS constructs
 

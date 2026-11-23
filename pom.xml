@@ -20,7 +20,16 @@
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <java-jwt.version>3.18.2</java-jwt.version>
+        <odm.dpds.parser.version>2.4.0</odm.dpds.parser.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>odm-spec-parser-repo</id>
+            <name>GitHub Packages for ODM Specification Parser</name>
+            <url>https://maven.pkg.github.com/opendatamesh-initiative/odm-specification-dpdescriptor-parser</url>
+        </repository>
+    </repositories>
 
     <dependencyManagement>
         <dependencies>
@@ -64,6 +73,12 @@
             <groupId>com.auth0</groupId>
             <artifactId>java-jwt</artifactId>
             <version>${java-jwt.version}</version>
+        </dependency>
+        <!-- service: ODM data product descriptor parser (descriptor model, datastore API, visitors) -->
+        <dependency>
+            <groupId>org.opendatamesh</groupId>
+            <artifactId>odm-specification-dpdescriptor-parser</artifactId>
+            <version>${odm.dpds.parser.version}</version>
         </dependency>
         <!-- service: REST resources with Jackson, YAML configuration, OpenAPI -->
         <dependency>

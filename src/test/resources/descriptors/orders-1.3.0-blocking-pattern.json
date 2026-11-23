@@ -32,7 +32,9 @@
                           "mustBeGreaterThan": 0
                         }
                       ]
-                    }
+                    },
+                    "specification": "json-schema",
+                    "specificationVersion": "1"
                   }
                 ]
               }
@@ -152,7 +154,9 @@
                           ]
                         }
                       }
-                    }
+                    },
+                    "specification": "json-schema",
+                    "specificationVersion": "1"
                   }
                 ]
               }

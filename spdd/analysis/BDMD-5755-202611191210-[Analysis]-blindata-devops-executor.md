@@ -10,6 +10,7 @@ Story **BDMD-5755**, item **D6** of the BDMD-5587 proposal (comment of 2026-11-1
 - **Structural check (D5)** is not in the job yet: it waits for BDMD-5756's probe type.
 - **Report destination:** the context (fqn, version, tag, environment, activity and task names) travels in the job (`configs.odm`), so the status call can post the report without pipeline parameters. The post happens only when `odm.product-plane.devops-service.active` is true and `activityName` and `taskName` were given.
 - **Fallback F1:** `scripts/verify-contract.sh`.
+- **Descriptor parsing** uses the ODM descriptor parser library (`odm-specification-dpdescriptor-parser` 2.4.0): the ODCS rules are read by a plugin (`OdcsTableDefinitionConverter`, a `DataStoreApiStandardDefinitionConverter` for `json-schema` 1.x tables) and the model is walked with the library's visitors. Tables must declare `json-schema`; references to other files must be resolved at publication.
 
 **Revision 4.** The quality rules live in the descriptor and only the agent runs them, so this executor is the only blocking quality gate (dbt tests D1 and run_results upload D10 moved to the backlog as a fallback). Adds the agent's BigQuery SQL limits (decision 13: `invalidValues` with `pattern`, identifiers), the missing time window, example environment names (`lab`, `prd`), the pipeline-tool question for fallback F1. Q4 answered.
 

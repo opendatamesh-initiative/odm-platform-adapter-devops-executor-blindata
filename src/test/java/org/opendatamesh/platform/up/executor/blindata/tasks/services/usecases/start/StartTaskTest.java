@@ -30,7 +30,7 @@ class StartTaskTest {
             "{name}-{environment}", Platform.BIGQUERY, new BlindataCredentials.ApiKey("u", "k"));
 
     private final DescriptorContractRulesReader reader =
-            new DescriptorContractRulesReader(TestConfigs.blindata(TestConfigs.valid()), Fixtures.JSON);
+            new DescriptorContractRulesReader(TestConfigs.blindata(TestConfigs.valid()));
     private ContractJob launched;
     private ProviderRunId presented;
 

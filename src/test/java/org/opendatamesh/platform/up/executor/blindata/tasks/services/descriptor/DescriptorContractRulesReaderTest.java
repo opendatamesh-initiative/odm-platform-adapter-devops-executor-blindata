@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DescriptorContractRulesReaderTest {
 
     private final DescriptorContractRulesReader reader =
-            new DescriptorContractRulesReader(TestConfigs.blindata(TestConfigs.valid()), Fixtures.JSON);
+            new DescriptorContractRulesReader(TestConfigs.blindata(TestConfigs.valid()));
 
     /**
      * Scenario: the executable rules of the orders descriptor
@@ -109,19 +109,41 @@ class DescriptorContractRulesReaderTest {
                 && s.reason().contains("more than once")));
     }
 
-    /** Scenario: a datastore API definition stored as a JSON string, with internal $ref, is read the same way. */
+    /**
+     * Scenario: a table whose definition is not json-schema 1.x is not read by the ODCS plugin
+     *   Given the orders table declares specification "avro" and still has quality rules
+     *   Then its rules are not executable and the table is reported as skipped with the reason
+     */
     @Test
-    void whenTheDefinitionIsAStringWithInternalRefsThenItIsResolved() throws Exception {
+    void whenATableIsNotJsonSchemaThenItsRulesAreReportedAsNotRead() {
         ObjectNode descriptor = (ObjectNode) Fixtures.ordersDescriptor();
-        ObjectNode api = (ObjectNode) descriptor.at("/interfaceComponents/outputPorts/0/promises/api");
-        ObjectNode definition = (ObjectNode) api.get("definition");
-        ObjectNode table = (ObjectNode) definition.at("/schema/tables/0");
-        ObjectNode components = definition.putObject("components");
-        components.set("orders", table.get("definition"));
-        table.putObject("definition").put("$ref", "#/components/orders");
-        api.put("definition", Fixtures.JSON.writeValueAsString(definition));
+        ((ObjectNode) descriptor.at("/interfaceComponents/outputPorts/0/promises/api/definition/schema/tables/0"))
+                .put("specification", "avro");
 
-        assertEquals(6, read(descriptor).rules().size());
+        ContractRules rules = read(descriptor);
+
+        assertTrue(rules.rules().isEmpty());
+        assertTrue(rules.skipped().stream().anyMatch(s -> s.reason().contains("not json-schema 1.x")));
+    }
+
+    /** Scenario: a descriptor the parser cannot read gives a 400 naming the version. */
+    @Test
+    void whenTheDescriptorCannotBeParsedThenBadRequest() {
+        ObjectNode descriptor = (ObjectNode) Fixtures.ordersDescriptor();
+        descriptor.put("interfaceComponents", "not an object");
+
+        org.opendatamesh.platform.up.executor.blindata.exceptions.BadRequestException e = org.junit.jupiter.api.Assertions.assertThrows(org.opendatamesh.platform.up.executor.blindata.exceptions.BadRequestException.class, () -> read(descriptor));
+
+        assertTrue(e.getMessage().contains("cannot be parsed"));
+    }
+
+    /** Scenario: numbers and arguments of a rule reach the agent exactly as written in the descriptor. */
+    @Test
+    void whenBuildingTheExecutionRuleThenOperatorsAndArgumentsKeepTheirJsonValues() {
+        JsonNode status = rule(read(Fixtures.ordersDescriptor()), "status_valid").executionRule();
+
+        assertEquals("[\"NEW\",\"SHIPPED\"]", status.at("/arguments/validValues").toString());
+        assertTrue(status.get("mustBe").isIntegralNumber());
     }
 
     private static com.fasterxml.jackson.databind.node.ArrayNode tableQuality(ObjectNode descriptor) {

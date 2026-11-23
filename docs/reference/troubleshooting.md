@@ -14,3 +14,5 @@
 | The task succeeded but its Results tab is empty | The DevOps service is not active in the executor, or the task has no `activityName` / `taskName`. The report is in the logs. |
 | The DevOps activity stays `PENDING` | DevOps approves executions through the Notification service; start it and make sure DevOps is subscribed. |
 | DevOps refuses the activity: `repository provider type is required` | DevOps requires `dataProductRepo.providerType` on every task; the executor ignores it. |
+| Start fails with 400 `The descriptor of ... cannot be parsed` | The descriptor in the Registry does not match the DPDS model the parser library reads. Check the version's content. |
+| The report says `the rules of table ... are not read` | The table's definition does not declare `specification: json-schema` with a 1.x version; the ODCS plugin only reads those. |
