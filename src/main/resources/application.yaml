@@ -1,23 +1,44 @@
 quarkus:
+  application:
+    name: odm-platform-adapter-devops-executor-blindata
   http:
     port: 9080
-  datasource:
-    active: false
-    devservices:
-      enabled: false
-  hibernate-orm:
-    active: false
   log:
     category:
-      "org.executor":
-        level: DEBUG
-
-executor:
-  simulation:
-    run-duration: 5s
-    outcome: SUCCEEDED
-
+      "org.opendatamesh.platform.up.executor.blindata":
+        level: INFO
+  smallrye-openapi:
+    path: /api-docs
+    info-title: ODM Platform Adapter DevOps Executor Blindata API
+    info-description: DevOps executor that verifies the data contract of a data product version on the Blindata agent
+    info-version: v1.0.0
+    info-license-name: Apache 2.0
+    info-license-url: http://www.apache.org/licenses/LICENSE-2.0.html
+  swagger-ui:
+    always-include: true
+    path: /swagger-ui
+odm:
+  product-plane:
+    registry-service:                                   # Registry v2: descriptor of the version (required)
+      active: true
+      address: ${ODM_REGISTRY_SERVICE_ADDRESS:}
+    devops-service:                                     # results post; inactive = report in the task logs only
+      active: ${ODM_DEVOPS_SERVICE_ACTIVE:false}
+      address: ${ODM_DEVOPS_SERVICE_ADDRESS:}
+blindata:
+  agent:
+    http:
+      connect-timeout: 5s
+      read-retries: 2                                   # job history and logs, Registry; never the job start
+    logs:
+      max-agent-log-size: 1M
+  contract-rules:
+    blocking-property: blocking                         # ODCS customProperties key (D11)
+    connection-property: x-blindataConnectionName       # same key as the observer
+  # environments: deployment-defined profiles, never packaged. Mount them in config/application.yml
+  # (see docs/reference/configuration-reference.md and config/application.example.yml).
 "%test":
-  executor:
-    simulation:
-      run-duration: 200ms
+  blindata:
+    agent:
+      http:
+        read-retries: 0

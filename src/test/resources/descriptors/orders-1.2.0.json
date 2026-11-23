@@ -1,0 +1,103 @@
+{
+  "dataProductDescriptor": "1.0.0",
+  "info": {
+    "fullyQualifiedName": "urn:dpds:acme:dataproducts:orders:1",
+    "domain": "sales",
+    "name": "orders",
+    "version": "1.2.0"
+  },
+  "interfaceComponents": {
+    "inputPorts": [
+      {
+        "fullyQualifiedName": "urn:dpds:acme:dataproducts:orders:1:inputPorts:raw",
+        "name": "raw",
+        "promises": {
+          "api": {
+            "specification": "datastoreapi",
+            "specificationVersion": "1.0.0",
+            "definition": {
+              "datastoreapi": "1.0.0",
+              "schema": {
+                "databaseSchemaName": "staging",
+                "tables": [
+                  {
+                    "name": "raw_orders",
+                    "definition": {
+                      "name": "raw_orders",
+                      "quality": [
+                        {"id": "raw_not_empty", "type": "library", "metric": "rowCount", "mustBeGreaterThan": 0}
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    "outputPorts": [
+      {
+        "fullyQualifiedName": "urn:dpds:acme:dataproducts:orders:1:outputPorts:orders",
+        "name": "orders",
+        "x-blindataConnectionName": "bq-sales",
+        "promises": {
+          "api": {
+            "specification": "datastoreapi",
+            "specificationVersion": "1.0.0",
+            "definition": {
+              "datastoreapi": "1.0.0",
+              "schema": {
+                "databaseSchemaName": "sales",
+                "tables": [
+                  {
+                    "name": "orders",
+                    "definition": {
+                      "name": "orders",
+                      "quality": [
+                        {"id": "orders_not_empty", "name": "Orders not empty", "description": "At least one row",
+                         "dimension": "completeness", "type": "library", "metric": "rowCount", "mustBeGreaterThan": 0},
+                        {"id": "orders_latest_partition", "type": "sql",
+                         "query": "SELECT COUNT(*) FROM {object} WHERE ingestion_date = (SELECT MAX(ingestion_date) FROM {object})",
+                         "mustBeGreaterThan": 0,
+                         "customProperties": [{"property": "blocking", "value": false}]},
+                        {"id": "orders_documentation", "type": "text", "description": "Orders are loaded every 5 minutes"},
+                        {"name": "rule_without_id", "type": "library", "metric": "rowCount", "mustBeGreaterThan": 0}
+                      ],
+                      "properties": {
+                        "order_id": {
+                          "name": "order_id",
+                          "quality": [
+                            {"id": "order_id_not_null", "type": "library", "metric": "nullValues", "mustBe": 0},
+                            {"id": "order_id_unique", "type": "library", "metric": "duplicateValues", "mustBe": 0,
+                             "customProperties": {"blocking": "false"}},
+                            {"customProperties": {"refName": "orders_not_empty"}}
+                          ]
+                        },
+                        "status": {
+                          "name": "status",
+                          "quality": [
+                            {"id": "status_valid", "type": "library", "metric": "invalidValues",
+                             "arguments": {"validValues": ["NEW", "SHIPPED"]}, "mustBe": 0}
+                          ]
+                        },
+                        "country_code": {
+                          "name": "country_code",
+                          "quality": [
+                            {"id": "country_code_pattern", "type": "library", "metric": "invalidValues",
+                             "arguments": {"pattern": "^[A-Z]{2}$"}, "mustBe": 0,
+                             "customProperties": [{"property": "blocking", "value": "false"}]}
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

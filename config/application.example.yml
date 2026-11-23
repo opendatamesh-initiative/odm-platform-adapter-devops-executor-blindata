@@ -1,0 +1,29 @@
+# Environment profiles of the Blindata executor: copy to config/application.yml (in the container:
+# /work/config/application.yml). Never packaged. Secrets come from environment variables.
+blindata:
+  environments:                                         # key = the "environment" pipeline parameter
+    lab:                                                # one Blindata tenant per environment, one shared agent
+      agent-url: ${BLINDATA_AGENT_URL}
+      tenant-uuid: ${BLINDATA_LAB_TENANT}
+      connection-name-template: "{name}"                # {name} = x-blindataConnectionName, {environment} = this key
+      platform: BIGQUERY                                # GENERIC | BIGQUERY: rules the agent cannot run are rejected or skipped
+      auth:
+        type: API_KEY                                   # API_KEY | OAUTH2_CLIENT_CREDENTIALS
+        api-key:
+          user: ${BLINDATA_LAB_USER}                    # observer: blindata.user
+          key: ${BLINDATA_LAB_APIKEY}                   # observer: blindata.password
+    prd:
+      agent-url: ${BLINDATA_AGENT_URL}
+      tenant-uuid: ${BLINDATA_PRD_TENANT}
+      connection-name-template: "{name}"
+      platform: BIGQUERY
+      auth:
+        type: OAUTH2_CLIENT_CREDENTIALS
+        oauth2:                                         # observer: blindata.oauth2.*
+          url: https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token
+          grant-type: client_credentials
+          scope: ${BLINDATA_PRD_OAUTH2_SCOPE}           # e.g. api://<Blindata API app id>/.default
+          client-id: ${BLINDATA_PRD_OAUTH2_CLIENT_ID}
+          client-secret: ${BLINDATA_PRD_OAUTH2_CLIENT_SECRET:}
+          client-certificate: ${BLINDATA_PRD_OAUTH2_CLIENT_CERTIFICATE:}                  # instead of the secret
+          client-certificate-private-key: ${BLINDATA_PRD_OAUTH2_CLIENT_CERTIFICATE_PRIVATE_KEY:}
