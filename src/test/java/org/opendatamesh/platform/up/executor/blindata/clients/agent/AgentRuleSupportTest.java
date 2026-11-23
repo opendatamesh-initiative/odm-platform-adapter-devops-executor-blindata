@@ -50,11 +50,37 @@ class AgentRuleSupportTest {
     /** Scenario: a sql rule with its own table reference needs no binding; one with {object} does. */
     @Test
     void whenASqlRuleUsesTheObjectPlaceholderThenItNeedsSchemaAndObject() {
-        ObjectNode withPlaceholder = Fixtures.JSON.createObjectNode().put("type", "sql").put("query", "SELECT COUNT(*) FROM {object}");
-        ObjectNode withoutPlaceholder = Fixtures.JSON.createObjectNode().put("type", "sql").put("query", "SELECT 1");
+        ObjectNode withPlaceholder = Fixtures.JSON.createObjectNode().put("type", "sql").put("query", "SELECT COUNT(*) FROM {object}").put("mustBe", 0);
+        ObjectNode withoutPlaceholder = Fixtures.JSON.createObjectNode().put("type", "sql").put("query", "SELECT 1").put("mustBe", 0);
 
         assertTrue(AgentRuleSupport.unsupportedReason(sql(withPlaceholder), Platform.BIGQUERY).isPresent());
         assertTrue(AgentRuleSupport.unsupportedReason(sql(withoutPlaceholder), Platform.BIGQUERY).isEmpty());
+    }
+
+    /** Scenario: metric names are matched case-insensitively and the deprecated "rule" key is accepted, as the agent does. */
+    @Test
+    void whenTheMetricIsWrittenInAnotherCaseOrWithTheDeprecatedKeyThenItIsSupported() {
+        ObjectNode lower = library("rowcount");
+        ObjectNode deprecated = Fixtures.JSON.createObjectNode().put("type", "library").put("rule", "rowCount").put("mustBeGreaterThan", 0);
+
+        assertTrue(AgentRuleSupport.unsupportedReason(rule(lower, "sales", "orders", null), Platform.GENERIC).isEmpty());
+        assertTrue(AgentRuleSupport.unsupportedReason(rule(deprecated, "sales", "orders", null), Platform.GENERIC).isEmpty());
+    }
+
+    /** Scenario: the agent compares with exactly one ODCS operator; a range needs two numeric bounds. */
+    @Test
+    void whenTheOperatorIsMissingDoubledOrMalformedThenTheRuleIsUnsupported() {
+        ObjectNode none = Fixtures.JSON.createObjectNode().put("type", "library").put("metric", "rowCount");
+        ObjectNode two = library("rowCount").put("mustBeGreaterOrEqualTo", 1);
+        ObjectNode badRange = Fixtures.JSON.createObjectNode().put("type", "library").put("metric", "rowCount");
+        badRange.putArray("mustBeBetween").add(1);
+        ObjectNode range = Fixtures.JSON.createObjectNode().put("type", "library").put("metric", "rowCount");
+        range.putArray("mustBeBetween").add(1).add(10);
+
+        assertTrue(AgentRuleSupport.unsupportedReason(rule(none, "sales", "orders", null), Platform.GENERIC).orElseThrow().contains("no comparison operator"));
+        assertTrue(AgentRuleSupport.unsupportedReason(rule(two, "sales", "orders", null), Platform.GENERIC).orElseThrow().contains("more than one"));
+        assertTrue(AgentRuleSupport.unsupportedReason(rule(badRange, "sales", "orders", null), Platform.GENERIC).orElseThrow().contains("two numeric bounds"));
+        assertTrue(AgentRuleSupport.unsupportedReason(rule(range, "sales", "orders", null), Platform.GENERIC).isEmpty());
     }
 
     private static ObjectNode library(String metric) {

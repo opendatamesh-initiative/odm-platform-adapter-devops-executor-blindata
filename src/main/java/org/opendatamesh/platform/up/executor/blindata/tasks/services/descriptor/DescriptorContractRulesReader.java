@@ -163,10 +163,10 @@ public class DescriptorContractRulesReader {
         if (type != null) {
             return type.toLowerCase();
         }
-        if (text(quality, "metric") != null) {
-            return ContractRule.TYPE_LIBRARY;
+        if (text(quality, "query") != null) {
+            return ContractRule.TYPE_SQL;
         }
-        return text(quality, "query") != null ? ContractRule.TYPE_SQL : null;
+        return text(quality, "metric") != null || text(quality, "rule") != null ? ContractRule.TYPE_LIBRARY : null;
     }
 
     private ObjectNode executionRule(JsonNode quality) {

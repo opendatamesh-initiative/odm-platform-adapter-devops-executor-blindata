@@ -16,9 +16,16 @@ public record ContractRule(String checkCode, String ruleId, String ruleName, Str
     public static final String TYPE_LIBRARY = "library";
     public static final String TYPE_SQL = "sql";
 
+    /** The library metric ({@code metric}, or the deprecated {@code rule} key). */
     public String metric() {
-        JsonNode metric = executionRule == null ? null : executionRule.get("metric");
-        return metric != null && metric.isTextual() ? metric.asText() : null;
+        if (executionRule == null) {
+            return null;
+        }
+        JsonNode metric = executionRule.get("metric");
+        if (metric == null || !metric.isTextual() || metric.asText().isBlank()) {
+            metric = executionRule.get("rule");
+        }
+        return metric != null && metric.isTextual() && !metric.asText().isBlank() ? metric.asText() : null;
     }
 
     public ContractRule withConnectionName(String agentConnectionName) {

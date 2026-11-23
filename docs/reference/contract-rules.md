@@ -1,5 +1,7 @@
 # Contract rules
 
+This page explains how the executor turns the descriptor's ODCS rules into agent checks, and what decides blocking. The full list of ODCS constructs the agent can run is in [ODCS support](odcs-support.md).
+
 ## Which rules run
 
 The executor reads every port whose `promises.api` is a **datastore API** and that declares `x-blindataConnectionName` (the property name is configurable). For each table of the schema it takes the `quality` rules of the table and of its columns.
@@ -7,7 +9,7 @@ The executor reads every port whose `promises.api` is a **datastore API** and th
 | Rule | What happens |
 |:--|:--|
 | `type: library` or `type: sql`, with an `id` | Sent to the agent |
-| no `type` | `library` if it has a `metric`, `sql` if it has a `query` |
+| no `type` | `sql` if it has a `query`, `library` if it has a `metric` |
 | `type: text` or `custom` | `SKIPPED`: not executable |
 | no `id` | `SKIPPED`: the check code needs a stable id |
 | port without connection name | `SKIPPED` |
@@ -55,6 +57,7 @@ The agent builds the SQL of `library` rules without a dialect switch and writes 
 | `invalidValues` with `arguments.pattern` | `BIGQUERY` | the agent emits `REGEXP_LIKE` and `CAST(... AS VARCHAR)`, which BigQuery does not have |
 | schema, table, column, `duplicateValues` properties outside `[a-zA-Z0-9_]+` | all | identifiers are emitted unquoted |
 | library metric other than `nullValues`, `missingValues`, `invalidValues`, `duplicateValues`, `rowCount` | all | not implemented by the agent |
+| no comparison operator, more than one, or a range without two numeric bounds | all | the agent compares with exactly one ODCS operator |
 | `library` rule, or `sql` rule using `{object}`, without schema and table | all | the binding is needed to build the SQL |
 
 ```mermaid

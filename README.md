@@ -1,6 +1,6 @@
 # ODM Platform DevOps Executor for Blindata
 
-> Verify the **data contract** of a data product version during its deploy: the [Open Data Mesh Platform](https://dpds.opendatamesh.org/) DevOps service runs the contract rules of the descriptor on the **Blindata agent** of the target environment, and the deploy fails when a blocking rule fails.
+> Run the **ODCS data contract declared in a data product descriptor** with the **Blindata agent**, as a task of the [Open Data Mesh Platform](https://dpds.opendatamesh.org/) DevOps deploy: the contract's quality rules are checked on the data just deployed, and the deploy fails when a blocking rule fails.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![Java 21](https://img.shields.io/badge/Java-21-ED8B00.svg?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/)
@@ -8,7 +8,7 @@
 
 ## What it does
 
-The quality rules of a data product live in its descriptor, as ODCS `quality` arrays on the output ports. When a version is deployed to an environment, a **"verify contract"** task runs after the provisioning task. DevOps hands it to this executor, which:
+The data contract of a data product lives in its descriptor: the ODCS 3.1 `quality` rules of the tables and columns of each output port. This executor lets you **run that contract with the Blindata agent**, with no extra definition in Blindata or in the pipeline. When a version is deployed to an environment, a **"verify contract"** task runs after the provisioning task. DevOps hands it to this executor, which:
 
 1. reads the version's descriptor from the ODM **Registry**;
 2. turns its executable rules into one **dry-run** job of `CONTRACT_RULE` probes and runs it on the **Blindata agent**, against the tables just deployed;
@@ -27,6 +27,20 @@ flowchart LR
 
 Nothing is written to Blindata at deploy time. Each environment's Blindata observer creates tables, checks and scheduled probes in its own tenant only **after** the deploy succeeds; the report in ODM is the record of every deploy-time check, failed ones included.
 
+## Which ODCS constructs run
+
+| ODCS construct | Supported |
+|:--|:--|
+| Rule types | `library`, `sql` (`text` and `custom` are reported as skipped) |
+| Library metrics | `rowCount`, `nullValues`, `missingValues`, `invalidValues` (`validValues`, `pattern`), `duplicateValues` (column, or several columns) |
+| Operators | `mustBe`, `mustNotBe`, `mustBeGreaterThan`, `mustBeGreaterOrEqualTo`, `mustBeLessThan`, `mustBeLessOrEqualTo`, `mustBeBetween`, `mustNotBeBetween` (one per rule) |
+| Units | `rows`, `percent` |
+| SQL rules | any query returning one number, with `{object}` and `{property}` placeholders |
+| Levels | table (`quality`) and column (`properties.<column>.quality`) |
+| Blocking | blocking by default; `customProperties` `blocking: false` makes a rule non-blocking |
+
+Details, examples and platform limits (for example `pattern` on BigQuery): [ODCS support](docs/reference/odcs-support.md).
+
 ## Capabilities
 
 - **One source of truth.** The rules are the ODCS `quality` rules of the descriptor, read the same way as the Blindata observer and TEST RULES in the Builder: same check codes, same physical binding.
@@ -40,7 +54,7 @@ Nothing is written to Blindata at deploy time. Each environment's Blindata obser
 
 ## Get started
 
-1. **Write the rules** in the descriptor: [Contract rules](docs/reference/contract-rules.md).
+1. **Write the contract** in the descriptor: [ODCS support](docs/reference/odcs-support.md) and [Contract rules](docs/reference/contract-rules.md).
 2. **Prepare Blindata**: a technical identity and an agent connection per environment, see [Blindata setup](docs/reference/blindata-setup.md).
 3. **Run the executor** with one profile per environment: [Build, run and deploy](docs/reference/build-and-run.md) and the [Configuration reference](docs/reference/configuration-reference.md).
 4. **Plug it into DevOps** and declare the task in the descriptor: [DevOps setup](docs/reference/devops-setup.md).
@@ -67,6 +81,7 @@ lifecycleInfo:
 | Document | Contents |
 |:--|:--|
 | [Concepts](docs/reference/concepts.md) | Architecture, what happens on start, status, logs and cancel, verdict rules, statelessness, topology with one tenant per environment |
+| [ODCS support](docs/reference/odcs-support.md) | Where the contract lives in the descriptor, every supported ODCS construct (types, metrics, operators, units, SQL), platforms, what is not supported |
 | [Contract rules](docs/reference/contract-rules.md) | Which rules run, blocking flag, check codes and physical binding, what the agent cannot run, writing rules for deploy time |
 | [Blindata setup](docs/reference/blindata-setup.md) | Technical identity (API key or OAuth2 / Entra ID), roles, agent connection per tenant |
 | [DevOps setup](docs/reference/devops-setup.md) | Registering the executor, declaring the task, results in DevOps, gating the next stage |
