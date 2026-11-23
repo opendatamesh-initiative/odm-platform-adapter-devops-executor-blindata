@@ -1,4 +1,4 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.visitors;
 
 import org.opendatamesh.dpds.datastoreapi.v1.model.DataStoreApi;
 import org.opendatamesh.dpds.datastoreapi.v1.model.DataStoreApiDatabaseService;
@@ -10,7 +10,7 @@ import org.opendatamesh.dpds.datastoreapi.v1.visitor.DataStoreApiVisitor;
 import org.opendatamesh.dpds.model.core.ComponentBase;
 import org.opendatamesh.dpds.model.core.ExternalDocs;
 import org.opendatamesh.dpds.visitors.core.StandardDefinitionVisitor;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsTableDefinition;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsTableDefinition;
 import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsTableDefinitionConverter;
 
 /**

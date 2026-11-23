@@ -1,4 +1,4 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.parser;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import org.opendatamesh.dpds.datastoreapi.v1.model.DataStoreApi;
@@ -32,9 +32,9 @@ import org.opendatamesh.dpds.model.internals.ApplicationComponent;
 import org.opendatamesh.dpds.model.internals.InfrastructuralComponent;
 import org.opendatamesh.dpds.model.internals.InternalComponents;
 import org.opendatamesh.dpds.model.internals.LifecycleTaskInfo;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsPropertyDefinition;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsQualityRule;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsTableDefinition;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsPropertyDefinition;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsQualityRule;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsTableDefinition;
 
 /** The descriptor model is bound by Jackson through reflection: registered for the native image. */
 @RegisterForReflection(targets = {

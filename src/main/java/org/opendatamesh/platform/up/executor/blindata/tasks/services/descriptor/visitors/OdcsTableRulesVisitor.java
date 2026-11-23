@@ -1,8 +1,8 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.visitors;
 
 import org.opendatamesh.dpds.visitors.core.ComponentBaseVisitor;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsPropertyDefinition;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsTableDefinition;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsPropertyDefinition;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsTableDefinition;
 
 /** The ODCS contract of one table: its table-level rules, then the rules of each column (bound to that column). */
 final class OdcsTableRulesVisitor implements ComponentBaseVisitor<OdcsTableDefinition> {

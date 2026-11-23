@@ -1,4 +1,4 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.visitors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.opendatamesh.dpds.datastoreapi.v1.model.DataStoreApi;

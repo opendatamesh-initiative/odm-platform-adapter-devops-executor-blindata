@@ -73,6 +73,16 @@ flowchart LR
 | Visitors (this executor) | Walk the model with the library's visitor interfaces: `DataProductVersionVisitor` (info, ports) → `InterfaceComponentsVisitor` / `PortVisitor` / `PromisesVisitor` (connection name, API) → `StandardDefinitionVisitor<DataStoreApi>` and `DataStoreApiVisitor` / `DataStoreApiSchemaVisitor` (schema, tables) → `ComponentBaseVisitor<OdcsTableDefinition>` (rules) |
 | `ContractRulesCollector` | Applies the mapping to each rule met: check code, binding, blocking flag, skip reasons |
 
+In the code (`tasks.services.descriptor`):
+
+| Package | Contents |
+|:--|:--|
+| `descriptor` | `DescriptorContractRulesReader`: the entry point, parse then walk |
+| `descriptor.parser` | `DescriptorParser`: the library parser with the datastore API converter and the ODCS plugin registered; reflection registration for the native image |
+| `descriptor.odcs` | `OdcsTableDefinitionConverter`: the ODCS plugin |
+| `descriptor.odcs.model` | `OdcsTableDefinition`, `OdcsPropertyDefinition`, `OdcsQualityRule`: the model the plugin produces |
+| `descriptor.visitors` | `ContractRulesWalker` (the only public type), the four visitors, `ContractRulesCollector` and `RuleLocation` |
+
 
 ## Supported ODCS constructs
 

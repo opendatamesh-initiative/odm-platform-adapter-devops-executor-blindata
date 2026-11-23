@@ -1,4 +1,4 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.visitors;
 
 import org.opendatamesh.dpds.model.blueprint.Blueprint;
 import org.opendatamesh.dpds.model.components.Components;

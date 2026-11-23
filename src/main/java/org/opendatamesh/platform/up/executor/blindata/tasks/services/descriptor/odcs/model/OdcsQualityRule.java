@@ -1,4 +1,4 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.opendatamesh.dpds.model.core.ComponentBase;

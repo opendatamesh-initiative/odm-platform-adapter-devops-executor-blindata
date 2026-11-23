@@ -1,4 +1,4 @@
-package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor;
+package org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.visitors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,7 +7,7 @@ import org.opendatamesh.platform.up.executor.blindata.tasks.model.ContractRule;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.ContractRuleKind;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.ContractRules;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.SkippedRule;
-import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.OdcsQualityRule;
+import org.opendatamesh.platform.up.executor.blindata.tasks.services.descriptor.odcs.model.OdcsQualityRule;
 
 import java.util.ArrayList;
 import java.util.Iterator;
