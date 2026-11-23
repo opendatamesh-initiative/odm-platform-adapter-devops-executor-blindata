@@ -1,6 +1,6 @@
 # ODCS support
 
-The executor runs the **data contract declared in the descriptor**: the [ODCS 3.1 data quality rules](https://bitol-io.github.io/open-data-contract-standard/v3.1.0/data-quality/) of each output port, executed by the **Blindata agent** as `CONTRACT_RULE` probes against the deployed data. Nothing has to be redefined in Blindata or in the pipeline: the descriptor is the single source of the contract.
+The executor runs the **data contract declared in the descriptor**: the [ODCS 3.1 data quality rules](https://bitol-io.github.io/open-data-contract-standard/v3.1.0/data-quality/) of the data product's ports, executed by the **Blindata agent** against the deployed data. Nothing has to be redefined in Blindata or in the pipeline: the descriptor is the single source of the contract. How the executor reads it internally is described in [Internals](internals.md).
 
 ```mermaid
 flowchart LR
@@ -11,7 +11,7 @@ flowchart LR
   end
   T --> EX[Blindata executor<br/>reads and checks the rules]
   C --> EX
-  EX -->|one CONTRACT_RULE check per rule| AG[Blindata agent]
+  EX -->|one check per rule| AG[Blindata agent]
   AG -->|SQL on the connection| DB[(Deployed data)]
   AG -->|measured value, pass or fail| EX
 ```
@@ -31,7 +31,7 @@ interfaceComponents:
               databaseSchemaName: sales                   # schema (BigQuery: dataset)
               tables:
                 - name: orders
-                  specification: json-schema               # read by the ODCS plugin
+                  specification: json-schema               # tables must be json-schema 1.x
                   specificationVersion: "1"
                   definition:
                     name: orders
@@ -50,39 +50,6 @@ interfaceComponents:
 ```
 
 Every port of the descriptor is read; ports without `x-blindataConnectionName` are reported as skipped. Tables must declare `specification: json-schema` with a 1.x `specificationVersion`, as the Blindata Builder writes them; a table of another specification that has `quality` rules is reported as not read. The descriptor is read as the Registry stores it: references to other files must already be resolved at publication.
-
-## How the contract is read
-
-The executor uses the ODM **descriptor parser library** (`odm-specification-dpdescriptor-parser`) and plugs an **ODCS plugin** into it:
-
-```mermaid
-flowchart LR
-  J[Descriptor JSON<br/>from the Registry] --> P[Descriptor parser]
-  P -->|datastoreapi 1.x| DS[DataStoreApiDefinitionConverter<br/>library]
-  DS -->|json-schema 1.x tables| O[OdcsTableDefinitionConverter<br/>ODCS plugin]
-  O --> M[Parsed model<br/>DataProductVersion → Port → DataStoreApi → OdcsTableDefinition]
-  M --> V[Visitors]
-  V --> R[Contract rules]
-```
-
-| Piece | Role |
-|:--|:--|
-| `Parser` (library) | Parses the descriptor into the DPDS model (`DataProductVersion`, ports, promises) |
-| `DataStoreApiDefinitionConverter` (library) | Turns each port's `datastoreapi` definition into a `DataStoreApi` |
-| `OdcsTableDefinitionConverter` (this executor, plugin) | A `DataStoreApiStandardDefinitionConverter` registered on the datastore API parser: turns each `json-schema` 1.x table definition into an `OdcsTableDefinition` with its table and column `quality` rules (`OdcsQualityRule`), keeping every ODCS key as written |
-| Visitors (this executor) | Walk the model with the library's visitor interfaces: `DataProductVersionVisitor` (info, ports) → `InterfaceComponentsVisitor` / `PortVisitor` / `PromisesVisitor` (connection name, API) → `StandardDefinitionVisitor<DataStoreApi>` and `DataStoreApiVisitor` / `DataStoreApiSchemaVisitor` (schema, tables) → `ComponentBaseVisitor<OdcsTableDefinition>` (rules) |
-| `ContractRulesCollector` | Applies the mapping to each rule met: check code, binding, blocking flag, skip reasons |
-
-In the code (`tasks.services.descriptor`):
-
-| Package | Contents |
-|:--|:--|
-| `descriptor` | `DescriptorContractRulesReader`: the entry point, parse then walk |
-| `descriptor.parser` | `DescriptorParser`: the library parser with the datastore API converter and the ODCS plugin registered; reflection registration for the native image |
-| `descriptor.odcs` | `OdcsTableDefinitionConverter`: the ODCS plugin |
-| `descriptor.odcs.model` | `OdcsTableDefinition`, `OdcsPropertyDefinition`, `OdcsQualityRule`: the model the plugin produces |
-| `descriptor.visitors` | `ContractRulesWalker` (the only public type), the four visitors, `ContractRulesCollector` and `RuleLocation` |
-
 
 ## Supported ODCS constructs
 

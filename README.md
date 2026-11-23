@@ -90,5 +90,6 @@ lifecycleInfo:
 | [Build, run and deploy](docs/reference/build-and-run.md) | Maven and Docker builds, profiles file, tests, local end-to-end run |
 | [Fallback without the executor](docs/reference/fallback.md) | Running the same check from the provisioning pipeline |
 | [Troubleshooting](docs/reference/troubleshooting.md) | Common errors and what they mean |
+| [Internals](docs/reference/internals.md) | For contributors: code layout, how the descriptor and its ODCS contract are parsed (parser library, ODCS plugin, visitors), the job's wire format |
 
 Design notes: [`spdd/analysis`](spdd/analysis).

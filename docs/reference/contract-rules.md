@@ -4,7 +4,7 @@ This page explains how the executor turns the descriptor's ODCS rules into agent
 
 ## Which rules run
 
-The executor parses the descriptor with the ODM descriptor parser library and an ODCS plugin (see [How the contract is read](odcs-support.md#how-the-contract-is-read)). It reads every port whose `promises.api` is a **datastore API** and that declares `x-blindataConnectionName` (the property name is configurable). For each `json-schema` table of the schema it takes the `quality` rules of the table and of its columns.
+The executor reads every port whose `promises.api` is a **datastore API** and that declares `x-blindataConnectionName` (the property name is configurable). For each `json-schema` table of the schema it takes the `quality` rules of the table and of its columns.
 
 | Rule | What happens |
 |:--|:--|
