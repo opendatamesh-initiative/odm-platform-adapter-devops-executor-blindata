@@ -30,7 +30,7 @@ The packaged `application.yaml` holds the safe defaults. Environment-specific va
 | `agent-url` | — | Base URL of the Blindata agent. With one shared agent, the same in every profile. |
 | `tenant-uuid` | — | Blindata tenant of the environment, sent as `X-BD-Tenant`. |
 | `connection-name-template` | `{name}` | Connection name the agent resolves: `{name}` is the descriptor's `x-blindataConnectionName`, `{environment}` the profile key. Leave `{name}` when agent connections are scoped per tenant. |
-| `platform` | `GENERIC` | `BIGQUERY` enables the BigQuery limits of the agent (see the README). |
+| `platform` | `GENERIC` | `BIGQUERY` enables the BigQuery limits of the agent (see [Contract rules](contract-rules.md#what-the-agent-cannot-run)). |
 | `auth.type` | — | `API_KEY` or `OAUTH2_CLIENT_CREDENTIALS`. |
 | `auth.api-key.user`, `auth.api-key.key` | — | Technical Blindata user and API key (`X-BD-User`, `X-BD-ApiKey`). Observer keys: `blindata.user`, `blindata.password`. |
 | `auth.oauth2.url` | — | Token endpoint of the identity provider. |

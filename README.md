@@ -1,99 +1,52 @@
-# Blindata executor
+# ODM Platform DevOps Executor for Blindata
 
-A stateless full-control DevOps executor that **verifies the data contract** of a data product version in one environment. The DevOps server calls it as the "verify contract" task of a deploy activity, after the provisioning task. The executor reads the version's descriptor from the ODM Registry, runs its executable contract rules (ODCS `quality`, types `library` and `sql`) on the Blindata agent of the environment, in dry run, and answers `SUCCEEDED` or `FAILED` with the per-rule detail.
+> Verify the **data contract** of a data product version during its deploy: the [Open Data Mesh Platform](https://dpds.opendatamesh.org/) DevOps service runs the contract rules of the descriptor on the **Blindata agent** of the target environment, and the deploy fails when a blocking rule fails.
 
-The service is a **Quarkus 3** application on port **9080**. Analysis: [`spdd/analysis/BDMD-5755-…-blindata-devops-executor.md`](spdd/analysis).
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00.svg?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Quarkus 3.40](https://img.shields.io/badge/Quarkus-3.40-4695EB.svg?style=flat-square&logo=quarkus&logoColor=white)](https://quarkus.io/)
 
 ## What it does
 
-1. **Start.** Finds the version in Registry v2 by `dataProductFqn` and the release tag (`executorParameters.ref.name`), or by `dataProductVersion` when given. Reads the rules of every port with `x-blindataConnectionName`, like the Blindata observer: check code `<domain> - <name> - <rule id>`, physical binding from `databaseSchemaName`, table and column. Launches one `QUALITY_PROBES` job of `CONTRACT_RULE` checks on the agent, always with `dryRun: true`, and returns `providerRunId = <environment>:<sequenceId>`.
-2. **Status.** Reads the job history. While the job runs: `RUNNING`. When it ends, computes the verdict from the rules, not from the agent's run status (a failed rule does not fail the agent job): `FAILED` when a **blocking** rule fails or errors, `SUCCEEDED` otherwise. Before answering the terminal status it posts the report to the task's results in DevOps (when configured).
-3. **Logs.** The full report as a table (outcome, blocking flag, rule, object, metric, detail; skipped rules with their reason), followed by the agent job log.
-4. **Cancel.** The agent cannot stop an ad-hoc job: a running job is accepted (200) and ends on its own; an ended job is 409; an unknown job 404.
+The quality rules of a data product live in its descriptor, as ODCS `quality` arrays on the output ports. When a version is deployed to an environment, a **"verify contract"** task runs after the provisioning task. DevOps hands it to this executor, which:
 
-Nothing is exported to Blindata at deploy time. **The ODM task (results and logs) is the record of the run**, including failed deploys. Blindata gets tables, checks and probes from each environment's observer, after the deploy activity of its stage succeeds.
+1. reads the version's descriptor from the ODM **Registry**;
+2. turns its executable rules into one **dry-run** job of `CONTRACT_RULE` probes and runs it on the **Blindata agent**, against the tables just deployed;
+3. answers **`SUCCEEDED`** or **`FAILED`**: the task fails when a **blocking** rule fails, and the activity fails with it, so the next stage (for example prod) cannot start;
+4. leaves the **per-rule report** in the task's results and logs.
 
-### Rules
-
-| Rule | Outcome |
-| --- | --- |
-| `library` or `sql` with an `id`, on a port with `x-blindataConnectionName` | sent to the agent |
-| `text`, `custom`, no `id`, no connection name, check code declared twice | `SKIPPED`, with the reason |
-| quality reference (`customProperties.refName`), legacy rule (`scoreStrategy`) | ignored |
-| agent row with score > 0 / score 0 / error row, no score or no row | `PASSED` / `FAILED` / `ERROR` |
-
-A rule is **blocking** unless its `customProperties` set `blocking` to `false` (boolean or string; ODCS list form `[{property, value}]` or object form).
-
-### Rules the agent cannot run
-
-The agent builds library SQL with no dialect switch and emits identifiers unquoted. At start, each rule is checked against the profile's `platform`:
-
-- `invalidValues` with `arguments.pattern` cannot run on `BIGQUERY` (`REGEXP_LIKE`, `CAST … AS VARCHAR`): write it as a `sql` rule with `REGEXP_CONTAINS`.
-- Schema, table and column names must match `[a-zA-Z0-9_]+` on any platform. On BigQuery the binding schema is the dataset only; the project comes from the connection's default project.
-- Unknown library metrics are refused (`nullValues`, `missingValues`, `invalidValues`, `duplicateValues`, `rowCount` are supported).
-
-A **blocking** rule that cannot run **rejects the start** (400, with the reason and the `sql` to write); a non-blocking one is `SKIPPED`. Also note that `invalidValues` counts `NULL` as invalid.
-
-There is no time window: library metrics scan the whole table on every deploy. On high-frequency tables, write the rules as `sql` rules on the latest partition.
-
-## Requirements
-
-- Java 21
-- Maven 3.9+ or the included `./mvnw` wrapper
-- ODM Registry v2, ODM DevOps v2 (`odm-platform-pp-devops-server`), a Blindata agent with `CONTRACT_RULE` probes
-
-## Run
-
-```bash
-./mvnw quarkus:dev
+```mermaid
+flowchart LR
+  D[Deploy activity<br/>in ODM DevOps] -->|task 1| P[Provisioning<br/>GitLab executor]
+  D -->|task 2: verify contract| E[Blindata executor]
+  E -->|descriptor of the version| R[ODM Registry]
+  E -->|dry-run job, environment profile| A[Blindata agent]
+  A -->|CONTRACT_RULE probes| DB[(Deployed tables<br/>e.g. BigQuery)]
+  E -.->|SUCCEEDED / FAILED<br/>+ per-rule report| D
 ```
 
-The environment profiles are not packaged: put them in `config/application.yml` (copy [`config/application.example.yml`](config/application.example.yml)). Quarkus reads that file from the working directory; in the container it is `/work/config/application.yml`.
+Nothing is written to Blindata at deploy time. Each environment's Blindata observer creates tables, checks and scheduled probes in its own tenant only **after** the deploy succeeds; the report in ODM is the record of every deploy-time check, failed ones included.
 
-```bash
-./mvnw package
-java -jar target/quarkus-app/quarkus-run.jar
-```
+## Capabilities
 
-Native image and Docker:
+- **One source of truth.** The rules are the ODCS `quality` rules of the descriptor, read the same way as the Blindata observer and TEST RULES in the Builder: same check codes, same physical binding.
+- **Blocking and non-blocking rules.** A rule is blocking unless its `customProperties` say `blocking: false`; non-blocking failures are reported without failing the deploy.
+- **Fail-closed.** A blocking rule that cannot be measured (missing table, SQL error, no result) fails the task too.
+- **Checked before running.** Rules the agent cannot run on the environment's platform (for example a regex rule on BigQuery) are refused at start, with the SQL rule to write instead.
+- **One executor for every environment.** Environment profiles map each environment to its Blindata tenant, credentials and connection; one agent can serve them all.
+- **API key or OAuth2.** The same authentication options as the Blindata observer, including Microsoft Entra ID service principals (secret or certificate).
+- **Stateless.** No database: everything travels in the run id and in the agent job. Run any number of replicas.
+- **A fallback without the executor.** A small script runs the same check from the last stage of the provisioning pipeline.
 
-```bash
-./mvnw package -DskipTests -Dnative -Dquarkus.native.container-build=true
-docker build -t odm-platform-adapter-devops-executor-blindata .
-docker run --rm -p 9080:9080 -v "$PWD/config:/work/config:ro" -e ODM_REGISTRY_SERVICE_ADDRESS=http://registry:8080 odm-platform-adapter-devops-executor-blindata
-```
+## Get started
 
-Tests (unit tests in `test`, integration tests with the application running in `verify`):
-
-```bash
-./mvnw verify
-```
-
-## Endpoints
-
-All four calls are `POST` under `/api/v2/up/executor/tasks/`. Every body carries `executorParameters`. OpenAPI at `/api-docs`, Swagger UI at `/swagger-ui`.
-
-| Path | Request body | Response |
-| --- | --- | --- |
-| `/start` | `{ "executorParameters", "pipelineParameters" }` | `{ "providerRunId" }` (`<environment>:<sequenceId>`) |
-| `/status` | `{ "executorParameters", "providerRunId" }` | `{ "providerRunId", "status" }` |
-| `/logs` | `{ "executorParameters", "providerRunId" }` | `{ "content", "generatedAt" }` |
-| `/cancel` | `{ "executorParameters", "providerRunId" }` | empty **200** |
-
-`pipelineParameters` (from the descriptor task's `configurations.params`):
-
-| Parameter | Required | Meaning |
-| --- | --- | --- |
-| `dataProductFqn` | yes | Data product to verify. |
-| `environment` | yes | Key of the environment profile (e.g. `lab`, `prd`). |
-| `dataProductVersion` | no | Version number; wins over the release tag. |
-| `activityName`, `taskName` | no | Needed to post the report to the task's results in DevOps. Without them the report is in the logs only. |
-
-Errors are plain text: **400** missing parameter, unknown environment, version not found, blocking rule the agent cannot run, malformed `providerRunId`; **404** unknown agent job; **409** cancel of an ended job; **502** the Registry or the agent failed or refused the credentials. Messages never contain credentials.
-
-Descriptor task:
+1. **Write the rules** in the descriptor: [Contract rules](docs/reference/contract-rules.md).
+2. **Prepare Blindata**: a technical identity and an agent connection per environment, see [Blindata setup](docs/reference/blindata-setup.md).
+3. **Run the executor** with one profile per environment: [Build, run and deploy](docs/reference/build-and-run.md) and the [Configuration reference](docs/reference/configuration-reference.md).
+4. **Plug it into DevOps** and declare the task in the descriptor: [DevOps setup](docs/reference/devops-setup.md).
 
 ```yaml
+# Descriptor: the deploy activity of one environment
 lifecycleInfo:
   deploy-lab:
     - name: provisioning
@@ -109,44 +62,18 @@ lifecycleInfo:
           taskName: verify-contract
 ```
 
-## Status mapping
+## In depth
 
-| Agent `runStatus` | Executor status |
-| --- | --- |
-| `RUNNING`, unknown value | `RUNNING` (the DevOps poll cap bounds the wait) |
-| `SUCCESS`, `WARNING` | `FAILED` if a blocking rule is `FAILED` or `ERROR`, else `SUCCEEDED` |
-| `ERROR` | `FAILED` |
-| `STOPPED` | `CANCELED` |
+| Document | Contents |
+|:--|:--|
+| [Concepts](docs/reference/concepts.md) | Architecture, what happens on start, status, logs and cancel, verdict rules, statelessness, topology with one tenant per environment |
+| [Contract rules](docs/reference/contract-rules.md) | Which rules run, blocking flag, check codes and physical binding, what the agent cannot run, writing rules for deploy time |
+| [Blindata setup](docs/reference/blindata-setup.md) | Technical identity (API key or OAuth2 / Entra ID), roles, agent connection per tenant |
+| [DevOps setup](docs/reference/devops-setup.md) | Registering the executor, declaring the task, results in DevOps, gating the next stage |
+| [Configuration reference](docs/reference/configuration-reference.md) | Every property, default, environment variable and validation rule |
+| [API reference](docs/reference/api-reference.md) | The four executor endpoints, payloads, errors, the report format |
+| [Build, run and deploy](docs/reference/build-and-run.md) | Maven and Docker builds, profiles file, tests, local end-to-end run |
+| [Fallback without the executor](docs/reference/fallback.md) | Running the same check from the provisioning pipeline |
+| [Troubleshooting](docs/reference/troubleshooting.md) | Common errors and what they mean |
 
-## Configuration
-
-ODM services follow the ODM pattern `odm.product-plane.<name>-service` (`active`, `address`); Blindata settings live under `blindata`. Full reference: [`docs/reference/configuration-reference.md`](docs/reference/configuration-reference.md).
-
-Authentication to Blindata supports the same options as the Blindata observer, per environment: an API key (`X-BD-User` + `X-BD-ApiKey`) or OAuth2 client credentials with a shared secret or a certificate (e.g. a Microsoft Entra ID service principal, which the Blindata API maps to the user `msazure:<oid>@<tid>`; that user needs `AGENTS_EDITOR` and `AGENTS_VIEWER` in the tenant).
-
-## DevOps configuration
-
-On the DevOps server:
-
-```yaml
-odm:
-  utility-plane:
-    executors:
-      polling-interval: 30s
-      services:
-        blindata:
-          address: http://odm-platform-adapter-devops-executor-blindata:9080
-          execution-mode: full-control
-```
-
-## Blindata agent configuration
-
-Declare the executor `blindata` in the agent's DevOps configuration with **no secrets**: the executor uses the technical identity of each environment profile, not the user's credentials.
-
-## Fallback without the executor
-
-[`scripts/verify-contract.sh`](scripts/verify-contract.sh) runs the same check from the last stage of the provisioning pipeline (GitLab job or Cloud Build step): it calls this service's start, status and logs, prints the report and exits 1 on `FAILED`, so the provisioning task fails.
-
-## Statelessness
-
-No database and no run store. The environment travels in the provider run id; the rules, their blocking flags and the verification context travel in the agent job (`configs.odm`, `configs.checks[].odm`, `configs.skipped`), which the agent keeps in its history. The only cache is the OAuth2 token, a performance cache. Any number of replicas can run behind one address.
+Design notes: [`spdd/analysis`](spdd/analysis).
