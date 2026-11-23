@@ -74,7 +74,7 @@ public final class RemoteStub implements AutoCloseable {
                 Fixtures.JSON.createObjectNode().put("access_token", TOKEN).put("expires_in", 3600).toString());
         reply("POST", "/api/v2/pp/devops/activities/tasks/results", 200, "{}");
         reply("GET", "/agent-api/v1/jobs/history/" + SEQUENCE_ID + "/logs", 200,
-                Fixtures.JSON.createObjectNode().put("sequenceId", SEQUENCE_ID).put("logContent", "agent: 5 checks executed").toString());
+                Fixtures.JSON.createObjectNode().put("sequenceId", SEQUENCE_ID).put("logContent", "agent: launching job\ragent: 5 checks executed").toString());
     }
 
     public void reply(String method, String pathWithQuery, int status, String body) {

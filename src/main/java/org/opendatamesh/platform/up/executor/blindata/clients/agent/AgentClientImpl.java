@@ -90,6 +90,7 @@ public class AgentClientImpl implements AgentClient {
     public Optional<String> readLog(EnvironmentProfile profile, long sequenceId) {
         return read(profile, HISTORY + sequenceId + "/logs", "read the log of job " + sequenceId)
                 .map(node -> node.path("logContent").asText(""))
+                .map(AgentClientImpl::normalizeLineBreaks)
                 .map(this::bound);
     }
 
@@ -166,6 +167,11 @@ public class AgentClientImpl implements AgentClient {
         }
         int half = (int) (max / 2);
         return log.substring(0, half) + TRUNCATED + log.substring(log.length() - half);
+    }
+
+    /** The agent separates log lines with a bare carriage return. */
+    private static String normalizeLineBreaks(String log) {
+        return log.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static String excerpt(String body) {

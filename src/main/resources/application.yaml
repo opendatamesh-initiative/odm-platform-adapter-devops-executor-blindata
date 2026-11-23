@@ -38,6 +38,9 @@ blindata:
   # environments: deployment-defined profiles, never packaged. Mount them in config/application.yml
   # (see docs/reference/configuration-reference.md and config/application.example.yml).
 "%test":
+  quarkus:
+    http:
+      test-port: 0
   blindata:
     agent:
       http:

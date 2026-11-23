@@ -49,7 +49,7 @@ class ReadTaskLogsAndCancelIT {
                 .body("content", containsString("sales - orders - order_id_not_null"))
                 .body("content", containsString("country_code_pattern"))
                 .body("content", containsString("REGEXP_CONTAINS"))
-                .body("content", containsString("agent: 5 checks executed"))
+                .body("content", containsString("agent: launching job\nagent: 5 checks executed"))
                 .body("generatedAt", notNullValue());
     }
 
