@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ContractVerdictTest {
 
     private static final VerificationContext CONTEXT =
-            new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "lab", "deploy-lab", "verify-contract");
+            new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "dev", "deploy-dev", "verify-contract");
 
     /** Scenario: all rules pass → SUCCEEDED. */
     @Test

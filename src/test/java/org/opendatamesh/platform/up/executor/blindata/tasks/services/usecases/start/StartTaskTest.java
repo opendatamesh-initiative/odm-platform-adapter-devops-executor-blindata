@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** BDMD-5755 decisions 2, 4 and 13: start of a contract verification, with fake ports. */
 class StartTaskTest {
 
-    private static final EnvironmentProfile LAB = new EnvironmentProfile("lab", "http://agent", "tenant-lab",
+    private static final EnvironmentProfile DEV = new EnvironmentProfile("dev", "http://agent", "tenant-dev",
             "{name}-{environment}", Platform.BIGQUERY, new BlindataCredentials.ApiKey("u", "k"));
 
     private final DescriptorContractRulesReader reader =
@@ -36,22 +36,22 @@ class StartTaskTest {
 
     /**
      * Scenario: start launches one dry-run job and returns <environment>:<sequenceId>
-     *   Given environment "lab" (BigQuery, connection template "{name}-{environment}") and version tag "v1.2.0"
+     *   Given environment "dev" (BigQuery, connection template "{name}-{environment}") and version tag "v1.2.0"
      *   When the task starts
-     *   Then the agent receives the executable rules with connection "bq-sales-lab"
+     *   Then the agent receives the executable rules with connection "bq-sales-dev"
      *   And the non-blocking pattern rule is skipped because BigQuery cannot run it
-     *   And the provider run id is "lab:42"
+     *   And the provider run id is "dev:42"
      */
     @Test
     void whenStartingThenTheJobIsLaunchedWithResolvedConnectionsAndSupportedRules() {
-        start(command("lab", "v1.2.0"), Fixtures.ordersDescriptor());
+        start(command("dev", "v1.2.0"), Fixtures.ordersDescriptor());
 
-        assertEquals("lab:42", presented.value());
+        assertEquals("dev:42", presented.value());
         assertEquals(5, launched.rules().size());
-        assertTrue(launched.rules().stream().allMatch(r -> r.connectionName().equals("bq-sales-lab")));
+        assertTrue(launched.rules().stream().allMatch(r -> r.connectionName().equals("bq-sales-dev")));
         assertTrue(launched.skipped().stream().anyMatch(s -> "country_code_pattern".equals(s.ruleId())
                 && s.reason().contains("REGEXP_CONTAINS")));
-        assertEquals("deploy-lab", launched.context().activityName());
+        assertEquals("deploy-dev", launched.context().activityName());
         assertEquals("1.2.0", launched.context().dataProductVersion());
     }
 
@@ -59,7 +59,7 @@ class StartTaskTest {
     @Test
     void whenABlockingRuleCannotRunThenTheStartIsRejected() {
         BadRequestException e = assertThrows(BadRequestException.class,
-                () -> start(command("lab", "v1.3.0"), Fixtures.ordersDescriptorWithBlockingPattern()));
+                () -> start(command("dev", "v1.3.0"), Fixtures.ordersDescriptorWithBlockingPattern()));
 
         assertTrue(e.getMessage().contains("country_code_pattern"));
         assertTrue(e.getMessage().contains("REGEXP_CONTAINS"));
@@ -70,20 +70,20 @@ class StartTaskTest {
     @Test
     void whenTheRequestCannotBeResolvedThenBadRequest() {
         assertTrue(assertThrows(BadRequestException.class, () -> start(
-                new StartTaskCommand(null, "lab", "v1", null, null, null), Fixtures.ordersDescriptor()))
+                new StartTaskCommand(null, "dev", "v1", null, null, null), Fixtures.ordersDescriptor()))
                 .getMessage().contains("dataProductFqn"));
         assertTrue(assertThrows(BadRequestException.class, () -> start(
-                new StartTaskCommand(Fixtures.ORDERS_FQN, "lab", null, null, null, null), Fixtures.ordersDescriptor()))
+                new StartTaskCommand(Fixtures.ORDERS_FQN, "dev", null, null, null, null), Fixtures.ordersDescriptor()))
                 .getMessage().contains("ref.name"));
         assertTrue(assertThrows(BadRequestException.class, () -> start(command("staging", "v1.2.0"), Fixtures.ordersDescriptor()))
                 .getMessage().contains("Unknown environment staging"));
-        assertTrue(assertThrows(BadRequestException.class, () -> start(command("lab", "v9"), null))
+        assertTrue(assertThrows(BadRequestException.class, () -> start(command("dev", "v9"), null))
                 .getMessage().contains("not found in the Registry"));
     }
 
     private void start(StartTaskCommand command, JsonNode descriptor) {
         new StartTask(command, runId -> presented = runId,
-                environment -> "lab".equals(environment) ? Optional.of(LAB) : Optional.empty(),
+                environment -> "dev".equals(environment) ? Optional.of(DEV) : Optional.empty(),
                 (fqn, tag, number) -> descriptor == null ? Optional.empty()
                         : Optional.of(new DataProductVersionDescriptor(fqn, descriptor.at("/info/version").asText(), tag, descriptor)),
                 new StartTaskRulesOutboundPort() {
@@ -104,6 +104,6 @@ class StartTaskTest {
     }
 
     private static StartTaskCommand command(String environment, String tag) {
-        return new StartTaskCommand(Fixtures.ORDERS_FQN, environment, tag, null, "deploy-lab", "verify-contract");
+        return new StartTaskCommand(Fixtures.ORDERS_FQN, environment, tag, null, "deploy-dev", "verify-contract");
     }
 }

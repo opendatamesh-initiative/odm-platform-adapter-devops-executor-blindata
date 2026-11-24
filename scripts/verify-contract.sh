@@ -1,6 +1,6 @@
 #!/bin/sh
 # Fallback F1 (BDMD-5755 decision 11): run the contract verification from the last stage of the provisioning
-# pipeline (GitLab job or Cloud Build step) through this executor's own API. Prints the report; exits 1 when the
+# pipeline (a GitLab job or a step of another CI tool) through this executor's own API. Prints the report; exits 1 when the
 # verification FAILED or was CANCELED, so the pipeline (and the provisioning task) fails.
 #
 # Required: EXECUTOR_URL, DATA_PRODUCT_FQN, ENVIRONMENT, RELEASE_TAG

@@ -24,7 +24,7 @@ class ReadTaskLogsAndCancelIT {
     void startJob() {
         stub = RemoteStubResource.stub();
         stub.reset();
-        ExecutorApi.start("lab", "v1.2.0").then().statusCode(200);
+        ExecutorApi.start("dev", "v1.2.0").then().statusCode(200);
     }
 
     /**
@@ -43,7 +43,7 @@ class ReadTaskLogsAndCancelIT {
         scores.put("sales - orders - status_valid", 100);
         stub.history("SUCCESS", scores, Map.of());
 
-        ExecutorApi.run("logs", "lab:42").then().statusCode(200)
+        ExecutorApi.run("logs", "dev:42").then().statusCode(200)
                 .body("content", containsString("Contract verification: FAILED"))
                 .body("content", containsString("FAILED   yes"))
                 .body("content", containsString("sales - orders - order_id_not_null"))
@@ -57,9 +57,9 @@ class ReadTaskLogsAndCancelIT {
     @Test
     void whenCancelingThenRunningIsAcceptedEndedConflictsUnknownIsNotFound() {
         stub.history("RUNNING", Map.of(), Map.of());
-        ExecutorApi.run("cancel", "lab:42").then().statusCode(200);
+        ExecutorApi.run("cancel", "dev:42").then().statusCode(200);
         stub.history("SUCCESS", Map.of(), Map.of());
-        ExecutorApi.run("cancel", "lab:42").then().statusCode(409).body(containsString("already ended"));
-        ExecutorApi.run("cancel", "lab:43").then().statusCode(404);
+        ExecutorApi.run("cancel", "dev:42").then().statusCode(409).body(containsString("already ended"));
+        ExecutorApi.run("cancel", "dev:43").then().statusCode(404);
     }
 }

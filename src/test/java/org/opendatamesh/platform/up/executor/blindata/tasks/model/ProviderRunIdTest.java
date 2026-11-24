@@ -9,11 +9,11 @@ class ProviderRunIdTest {
 
     @Test
     void whenParsingAValidIdThenEnvironmentAndSequenceIdAreRead() {
-        ProviderRunId id = ProviderRunId.parse("lab:1234").orElseThrow();
+        ProviderRunId id = ProviderRunId.parse("dev:1234").orElseThrow();
 
-        assertEquals("lab", id.environment());
+        assertEquals("dev", id.environment());
         assertEquals(1234, id.sequenceId());
-        assertEquals("lab:1234", id.value());
+        assertEquals("dev:1234", id.value());
     }
 
     @Test
@@ -21,8 +21,8 @@ class ProviderRunIdTest {
         assertTrue(ProviderRunId.parse(null).isEmpty());
         assertTrue(ProviderRunId.parse("1234").isEmpty());
         assertTrue(ProviderRunId.parse(":1234").isEmpty());
-        assertTrue(ProviderRunId.parse("lab:").isEmpty());
-        assertTrue(ProviderRunId.parse("lab:x").isEmpty());
-        assertTrue(ProviderRunId.parse("lab:-1").isEmpty());
+        assertTrue(ProviderRunId.parse("dev:").isEmpty());
+        assertTrue(ProviderRunId.parse("dev:x").isEmpty());
+        assertTrue(ProviderRunId.parse("dev:-1").isEmpty());
     }
 }

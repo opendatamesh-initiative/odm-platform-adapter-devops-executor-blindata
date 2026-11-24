@@ -62,7 +62,7 @@ Details, examples and platform limits (for example `pattern` on BigQuery): [ODCS
 ```yaml
 # Descriptor: the deploy activity of one environment
 lifecycleInfo:
-  deploy-lab:
+  deploy-dev:
     - name: provisioning
       service: { $href: gitlab }
     - name: verify-contract
@@ -71,8 +71,8 @@ lifecycleInfo:
       configurations:
         params:
           dataProductFqn: urn:dpds:acme:dataproducts:orders:1
-          environment: lab
-          activityName: deploy-lab
+          environment: dev
+          activityName: deploy-dev
           taskName: verify-contract
 ```
 

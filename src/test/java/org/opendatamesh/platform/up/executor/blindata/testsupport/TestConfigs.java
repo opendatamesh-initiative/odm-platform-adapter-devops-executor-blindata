@@ -19,26 +19,26 @@ public final class TestConfigs {
     private TestConfigs() {
     }
 
-    /** A valid configuration: Registry, DevOps, profile "lab" (API key, BigQuery) and "prd" (OAuth2 secret). */
+    /** A valid configuration: Registry, DevOps, profile "dev" (API key, BigQuery) and "prod" (OAuth2 secret). */
     public static Map<String, String> valid() {
         Map<String, String> properties = new HashMap<>();
         properties.put("odm.product-plane.registry-service.active", "true");
         properties.put("odm.product-plane.registry-service.address", "http://registry:8080");
         properties.put("odm.product-plane.devops-service.active", "true");
         properties.put("odm.product-plane.devops-service.address", "http://devops:8080");
-        properties.put("blindata.environments.lab.agent-url", "http://agent:8082");
-        properties.put("blindata.environments.lab.tenant-uuid", "tenant-lab");
-        properties.put("blindata.environments.lab.platform", "BIGQUERY");
-        properties.put("blindata.environments.lab.auth.type", "API_KEY");
-        properties.put("blindata.environments.lab.auth.api-key.user", "executor@lab");
-        properties.put("blindata.environments.lab.auth.api-key.key", "lab-key");
-        properties.put("blindata.environments.prd.agent-url", "http://agent:8082");
-        properties.put("blindata.environments.prd.tenant-uuid", "tenant-prd");
-        properties.put("blindata.environments.prd.auth.type", "OAUTH2_CLIENT_CREDENTIALS");
-        properties.put("blindata.environments.prd.auth.oauth2.url", "http://idp/token");
-        properties.put("blindata.environments.prd.auth.oauth2.scope", "api://blindata/.default");
-        properties.put("blindata.environments.prd.auth.oauth2.client-id", "executor");
-        properties.put("blindata.environments.prd.auth.oauth2.client-secret", "prd-secret");
+        properties.put("blindata.environments.dev.agent-url", "http://agent:8082");
+        properties.put("blindata.environments.dev.tenant-uuid", "tenant-dev");
+        properties.put("blindata.environments.dev.platform", "BIGQUERY");
+        properties.put("blindata.environments.dev.auth.type", "API_KEY");
+        properties.put("blindata.environments.dev.auth.api-key.user", "executor@dev");
+        properties.put("blindata.environments.dev.auth.api-key.key", "dev-key");
+        properties.put("blindata.environments.prod.agent-url", "http://agent:8082");
+        properties.put("blindata.environments.prod.tenant-uuid", "tenant-prod");
+        properties.put("blindata.environments.prod.auth.type", "OAUTH2_CLIENT_CREDENTIALS");
+        properties.put("blindata.environments.prod.auth.oauth2.url", "http://idp/token");
+        properties.put("blindata.environments.prod.auth.oauth2.scope", "api://blindata/.default");
+        properties.put("blindata.environments.prod.auth.oauth2.client-id", "executor");
+        properties.put("blindata.environments.prod.auth.oauth2.client-secret", "prod-secret");
         return properties;
     }
 

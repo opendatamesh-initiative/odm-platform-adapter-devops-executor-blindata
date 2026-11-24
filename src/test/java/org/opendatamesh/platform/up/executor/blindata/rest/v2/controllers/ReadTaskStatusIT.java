@@ -32,7 +32,7 @@ class ReadTaskStatusIT {
     void startJob() {
         stub = RemoteStubResource.stub();
         stub.reset();
-        ExecutorApi.start("lab", "v1.2.0").then().statusCode(200);
+        ExecutorApi.start("dev", "v1.2.0").then().statusCode(200);
     }
 
     /** Scenario: while the agent job runs, the status is RUNNING and nothing is posted to DevOps. */
@@ -40,8 +40,8 @@ class ReadTaskStatusIT {
     void whenTheJobRunsThenRunning() {
         stub.history("RUNNING", Map.of(), Map.of());
 
-        ExecutorApi.run("status", "lab:42").then().statusCode(200)
-                .body("status", equalTo("RUNNING")).body("providerRunId", equalTo("lab:42"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200)
+                .body("status", equalTo("RUNNING")).body("providerRunId", equalTo("dev:42"));
         assertTrue(stub.requests("POST", RESULTS).isEmpty());
     }
 
@@ -50,12 +50,12 @@ class ReadTaskStatusIT {
     void whenAllRulesPassThenSucceededAndTheReportIsPosted() {
         stub.history("SUCCESS", ALL_PASS, Map.of());
 
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("SUCCEEDED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("SUCCEEDED"));
 
         JsonNode post = stub.lastRequest("POST", RESULTS).json();
         assertEquals(Fixtures.ORDERS_FQN, post.get("dataProductFqn").asText());
         assertEquals("v1.2.0", post.get("dataProductVersionTag").asText());
-        assertEquals("deploy-lab", post.get("activityName").asText());
+        assertEquals("deploy-dev", post.get("activityName").asText());
         assertEquals("verify-contract", post.get("taskName").asText());
     }
 
@@ -71,7 +71,7 @@ class ReadTaskStatusIT {
         scores.put("sales - orders - order_id_not_null", 0);
         stub.history("SUCCESS", scores, Map.of());
 
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("FAILED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("FAILED"));
 
         JsonNode report = Fixtures.JSON.readTree(stub.lastRequest("POST", RESULTS).json().at("/results/0/content").asText());
         assertEquals("FAILED", report.get("verdict").asText());
@@ -87,7 +87,7 @@ class ReadTaskStatusIT {
         scores.put("sales - orders - order_id_unique", 0);
         stub.history("WARNING", scores, Map.of());
 
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("SUCCEEDED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("SUCCEEDED"));
     }
 
     /** Scenario: an error row on a blocking rule (e.g. table not found) fails closed. */
@@ -97,16 +97,16 @@ class ReadTaskStatusIT {
         scores.remove("sales - orders - orders_not_empty");
         stub.history("SUCCESS", scores, Map.of("sales - orders - orders_not_empty", "Table sales.orders not found"));
 
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("FAILED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("FAILED"));
     }
 
     /** Scenario: a stopped agent job is CANCELED; a crashed one is FAILED. */
     @Test
     void whenTheJobIsStoppedOrCrashedThenCanceledOrFailed() {
         stub.history("STOPPED", Map.of(), Map.of());
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("CANCELED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("CANCELED"));
         stub.history("ERROR", ALL_PASS, Map.of());
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("FAILED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("FAILED"));
     }
 
     /** Scenario: a DevOps refusal of the results does not change the verdict. */
@@ -115,7 +115,7 @@ class ReadTaskStatusIT {
         stub.reply("POST", RESULTS, 400, "{\"message\":\"task not running\"}");
         stub.history("SUCCESS", ALL_PASS, Map.of());
 
-        ExecutorApi.run("status", "lab:42").then().statusCode(200).body("status", equalTo("SUCCEEDED"));
+        ExecutorApi.run("status", "dev:42").then().statusCode(200).body("status", equalTo("SUCCEEDED"));
     }
 
     /** Scenario: malformed id → 400, unknown environment → 400, unknown job → 404. */
@@ -123,6 +123,6 @@ class ReadTaskStatusIT {
     void whenTheRunIdIsWrongThenTheErrorFollowsTheContract() {
         ExecutorApi.run("status", "42").then().statusCode(400);
         ExecutorApi.run("status", "staging:42").then().statusCode(400);
-        ExecutorApi.run("status", "lab:43").then().statusCode(404);
+        ExecutorApi.run("status", "dev:43").then().statusCode(404);
     }
 }

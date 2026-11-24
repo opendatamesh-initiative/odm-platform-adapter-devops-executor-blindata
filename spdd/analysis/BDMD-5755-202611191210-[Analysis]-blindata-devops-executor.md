@@ -10,7 +10,7 @@ Story **BDMD-5755**, item **D6** of the BDMD-5587 proposal (comment of 2026-11-1
 - template 1.1.1, public repository (decision 12, Q8 answered);
 - configuration, edge cases, risks and test strategy updated; the local end-to-end run is recorded (Test strategy).
 
-**Revision 4.** The quality rules live in the descriptor and only the agent runs them, so this executor is the only blocking quality gate (dbt tests D1 and run_results upload D10 moved to the backlog as a fallback). Adds the agent's BigQuery SQL limits (decision 13: `invalidValues` with `pattern`, identifiers), the missing time window, example environment names (`lab`, `prd`), the pipeline-tool question for fallback F1. Q4 answered.
+**Revision 4.** The quality rules live in the descriptor and only the agent runs them, so this executor is the only blocking quality gate (dbt tests D1 and run_results upload D10 moved to the backlog as a fallback). Adds the agent's BigQuery SQL limits (decision 13: `invalidValues` with `pattern`, identifiers), the missing time window, example environment names (`dev`, `prod`), the pipeline-tool question for fallback F1. Q4 answered.
 
 **Revision 3.** Adds the requirement to support OAuth scenarios like Microsoft Entra ID, as well as API keys, for Blindata authentication, aligned with what the Blindata observer supports (decision 5, T8, Q11, F-5). Suggested configuration rewritten on the ODM services pattern (`odm.product-plane.<name>-service`, `blindata.*` group, `auth.type`, mounted profiles file).
 
@@ -53,7 +53,7 @@ BDMD-5755 (Italian in Jira, summarised in English):
 Context that frames the analysis:
 
 - **The ODCS 3.1 `quality` arrays on the descriptor's output ports are the single source of truth.** One observer per environment writes to its own tenant **only when a deploy activity of its own stage succeeds** (`DATA_PRODUCT_ACTIVITY_COMPLETED` / `ACTIVITY_SUCCEEDED`, filtered on the stage): tables, then quality suite and one check per rule, then `CONTRACT_RULE` probes. `DATA_PRODUCT_VERSION_CREATED` writes nothing to environment tenants. The agent then monitors those checks on a schedule. **Consequence for this executor:** at contract-check time (during the deploy activity) the tables and checks may not exist yet in the environment's tenant, so the executor must not depend on them: it builds everything from the descriptor and never reads or writes Blindata checks. Check codes (`<domain> - <name> - <rule id>`) are identical in every tenant.
-- **The deploy activity** is: policy pre-deploy (D9) → Task 1, provisioning executor (GitLab, or another pipeline tool, see decision 11) → **Task 2, Blindata executor (this story)** → the next activity (`prd`), gated by the stage-transition policy.
+- **The deploy activity** is: policy pre-deploy (D9) → Task 1, provisioning executor (GitLab, or another pipeline tool, see decision 11) → **Task 2, Blindata executor (this story)** → the next activity (`prod`), gated by the stage-transition policy.
 - **This executor is the only blocking quality gate .** The rules live in the descriptor and only the agent runs them: at deploy (this executor) and afterwards as scheduled probes. There are no dbt tests in the pipeline: D1 (descriptor → dbt tests, BDMD-5679) and D10 (`run_results.json` upload, BDMD-5758) are in the backlog as a fallback, not parallel paths.
 - **Fallback.** If the executor is not ready in time, the fallback (F1) runs the same check from the provisioning pipeline.
 
@@ -64,7 +64,7 @@ Context that frames the analysis:
 - **DevOps v2 executor API** (`/api/v2/up/executor/tasks/{start,status,logs,cancel}`, all `POST`, every body carries `executorParameters`). Start adds `pipelineParameters` (free `Map<String,String>`, placeholders `${activity.results.task.path}` already resolved). Status, logs and cancel add `providerRunId` (opaque, ≤255 chars). Status answers `RUNNING | SUCCEEDED | FAILED | CANCELED`. Logs answer one `{content, generatedAt}` block, read once after the run ends. **The executor "knows nothing about activities, versions or policies"** (DevOps docs §4): neither the activity uuid, nor the data product, nor the task name reach it.
 - **What the UI sends for a task** (`ExecuteDevOpsV2ActivityFlow.planDevOpsV2Execution`): `executorName` = descriptor `task.service.$href`; `executorParameters` = `{repositoryKey?, dataProductRepo, ref: {name: release.tag, type: TAG}, pipelineIdentifier?}`; `pipelineParameters` = descriptor `task.configurations.params`. The activity itself carries `dataProductVersionUuid`, `dataProductFqn`, `dataProductVersionTag`, `name`, `sortOrder`, but DevOps does not forward them to executors.
 - **Task logs and results in DevOps v2.** `TaskLog` and `TaskResult` are text rows on the task. Execute Task appends **one log block** when a full-control run ends. `POST /api/v2/pp/devops/activities/tasks/results` "appends results to a task of either mode", addressed by `activityUuid` **or** by `dataProductFqn` + `dataProductVersionTag` + `activityName` + `taskName`, accepted only while the task is `RUNNING`. The UI task detail has a **Results** tab (JSON content rendered with a JSON viewer) and a **Logs** tab (preformatted text). DevOps v2 has no authentication.
-- **Policy on DevOps v2** (Policy V1 adapter, BDMD-5438). DevOps v2 asks Policy before an activity (`ACTIVITY_EXECUTION_RESULT` name, input `{activity, otherActivities}`) and before each task (`TASK_EXECUTION_RESULT` name, input `{activity with tasks and their results, task}`). **`ACTIVITY_STAGE_TRANSITION` is not sent by v2** (DD-3 of BDMD-5438); in `odm-platform` (DevOps v1) it is sent by `DevopsPolicyServiceProxy.isStageTransitionValid`. On v2 the "test → prod" gate is therefore a policy on the `prd` activity request that reads `otherActivities[name = <test activity>].status`. `otherActivities` carry status but no tasks; the task-level request carries the results of the tasks of the *same* activity.
+- **Policy on DevOps v2** (Policy V1 adapter, BDMD-5438). DevOps v2 asks Policy before an activity (`ACTIVITY_EXECUTION_RESULT` name, input `{activity, otherActivities}`) and before each task (`TASK_EXECUTION_RESULT` name, input `{activity with tasks and their results, task}`). **`ACTIVITY_STAGE_TRANSITION` is not sent by v2** (DD-3 of BDMD-5438); in `odm-platform` (DevOps v1) it is sent by `DevopsPolicyServiceProxy.isStageTransitionValid`. On v2 the "test → prod" gate is therefore a policy on the `prod` activity request that reads `otherActivities[name = <test activity>].status`. `otherActivities` carry status but no tasks; the task-level request carries the results of the tasks of the *same* activity.
 - **GitLab executor** (`odm-platform-adapter-devops-executor-gitlab`, the precedent). Quarkus, template `blindata-backend-service-template-quarkus` 1.1.0 with modules `usecases`, `http-service`, `rest-client`, base package `org.opendatamesh.platform.up.executor.gitlab`. Stateless: everything comes from the request or the remote tool. Status mapping in one place (`RunStatus`), unknown remote statuses → `RUNNING` so the DevOps poll cap bounds the wait. Cancel reads first, then 404 / 409 / 200. Credentials per request as `x-odm-<secretType>` headers, never cached or logged. It reports only the pipeline status and the aggregated job logs, **no results** (the gap also noted for BDMD-5688).
 - **This repo before the story.** Starter copy: template 1.1.0 with *all* modules, base package `org.executor`, identity `odm-platform-adapter-devops-executor-starter`, `SimulatedRunStore`. It was re-rendered from the template (decision 12).
 - **ODM descriptor parser** (`odm-specification-dpdescriptor-parser`, 2.4.0, used by the Registry, blueprint server and observer). Parses a descriptor into the DPDS model (`DataProductVersion`, ports, promises). Plugins: `DefinitionConverter` for port API definitions (the library's `DataStoreApiDefinitionConverter` turns `datastoreapi` 1.x into a `DataStoreApi`), and `DataStoreApiStandardDefinitionConverter` for table definitions. Traversal through visitor interfaces (`DataProductVersionVisitor`, `InterfaceComponentsVisitor`, `PortVisitor`, `PromisesVisitor`, `StandardDefinitionVisitor`, `DataStoreApiVisitor`, `DataStoreApiSchemaVisitor`, `ComponentBaseVisitor`). It resolves references to other files only, not internal `$ref`s.
@@ -103,7 +103,7 @@ Implicit:
 - **The agent's job status is not the verdict.** A job can end `SUCCESS` with failed rules. The executor computes the verdict from `jobResults`.
 - **At deploy time tables may be empty.** Value rules can pass or fail for the wrong reason. The proposal says the gate is reliable on structure; value rules are better judged by the scheduled probes (see open question Q5).
 - **The status call does not receive `pipelineParameters`.** Everything the executor needs at status time must be in `executorParameters`, in the provider run id, or in the agent job itself.
-- **The stage-transition gate is a policy concern, not the executor's.** The executor only makes the `lab` activity fail; D9 (BDMD-5651) writes the policy on the `prd` activity request.
+- **The stage-transition gate is a policy concern, not the executor's.** The executor only makes the `dev` activity fail; D9 (BDMD-5651) writes the policy on the `prod` activity request.
 
 ## Strategic Approach
 
@@ -127,7 +127,7 @@ sequenceDiagram
   BX->>BX: extract executable rules (library/sql), blocking flags, bindings
   BX->>AG: POST /agent-api/v1/jobs/runner/async QUALITY_PROBES {dryRun:true} + X-BD-*
   AG-->>BX: {sequenceId}
-  BX-->>DevOps: {providerRunId = "lab:1234"}
+  BX-->>DevOps: {providerRunId = "dev:1234"}
   AG->>BQ: CONTRACT_RULE probes + structural check (D5)
   loop every polling interval (30 s)
     DevOps->>BX: POST status {executorParameters, providerRunId}
@@ -168,13 +168,13 @@ sequenceDiagram
 2. **What the executor receives, and the descriptor task to declare.**
 
    - The data product version is resolved from **`dataProductFqn`** (pipeline parameter, stable across versions) and **`executorParameters.ref.name`** (the release tag the UI already sends) via Registry v2 (`products?fqn=` then `products-versions?dataProductUuid=&tag=`, then `products-versions/{uuid}`). An optional `dataProductVersion` parameter wins over the tag when present.
-   - **`environment`** is a pipeline parameter, literal in the descriptor task of each deploy activity (`deploy-lab` → `lab`, `deploy-prd` → `prd`; example environment names). It selects the environment profile.
+   - **`environment`** is a pipeline parameter, literal in the descriptor task of each deploy activity (`deploy-dev` → `dev`, `deploy-prod` → `prod`; example environment names). It selects the environment profile.
    - **`activityName`** and **`taskName`** are pipeline parameters too, only needed by decision 6a (results to DevOps).
    - Descriptor task (proposal):
 
      ```yaml
      lifecycleInfo:
-       deploy-lab:
+       deploy-dev:
          - name: provisioning
            service: { $href: gitlab }
            # ...
@@ -184,8 +184,8 @@ sequenceDiagram
            configurations:
              params:
                dataProductFqn: urn:dpds:acme:dataproducts:sales:1
-               environment: lab
-               activityName: deploy-lab
+               environment: dev
+               activityName: deploy-dev
                taskName: verify-contract
      ```
 
@@ -211,7 +211,7 @@ sequenceDiagram
      - A descriptor the parser cannot read is a 400 at start. Internal `$ref`s and definitions stored as JSON strings are not resolved: the descriptor is read as the Registry stores it.
    - **Code sharing.** The mapping is the observer's (check code, binding, connection, skip rules), re-implemented on the same parser library; the ODCS plugin could move into a shared library used by the observer too (F-3, low priority).
 
-4. **Connection per environment.** The descriptor has one `x-blindataConnectionName` per port, but the same port must be checked in `lab` and in `prd` against different BigQuery projects.
+4. **Connection per environment.** The descriptor has one `x-blindataConnectionName` per port, but the same port must be checked in `dev` and in `prod` against different BigQuery projects.
    - **Topology (confirmed 2026-11-19):** one Blindata tenant per environment (GCP project); one ODM platform with **one Blindata executor** shared by all environments; **one Blindata agent** shared by all environments (multi-tenant, with per-environment profiles and ODM proxy configurations); one observer per environment, writing to its own tenant.
    - So the executor keeps an **environment profile**: environment → agent base URL, tenant (`X-BD-Tenant`), credentials, connection. With one agent the base URL is the same in every profile; it stays a per-profile setting so the topology can change without code. Routing per environment is configuration of the shared service, not separate deployments.
    - The connection name must **resolve per tenant**: if the agent scopes its connections per tenant (the `X-BD-Tenant` header selects the tenant's connection catalog), the descriptor name works unchanged in every environment. If it does not, the profile maps `<descriptor name>` → `<env name>` with `connection-name-template` (e.g. `{name}-{environment}`; default `{name}`). Which of the two applies is BDMD-5757's call; the setting covers both, and with per-tenant connections the template is simply left at its default.
@@ -232,7 +232,7 @@ sequenceDiagram
    - **Decision:** both, observer parity, in this story (implemented; the API key path is tested end to end on the local stack, OAuth2 only against a stub). Use OAuth2 (Entra ID, secret or certificate) wherever the target environment authenticates Blindata with Entra; API key on the local stack and as fallback.
 
 6. **Where the per-rule detail lives in ODM: the place of record of the deploy-time check.** Deploy-time results are never exported to Blindata (dry run, Key Business Rules), so the ODM task is the **only** record of what the check found, including the runs that failed the deploy. This is a requirement, not a convenience: the report must be complete (every rule with outcome, blocking flag, metric, error message, plus skipped rules), stable once the task ends, and always written. The executor API returns only a status and one log block; the full-control path stores no results (the same gap as BDMD-5688).
-   - **(a) Results, PoC: the executor posts the report to DevOps** `POST /api/v2/pp/devops/activities/tasks/results`, addressed by `dataProductFqn` + version tag + `activityName` + `taskName`, during the status call that detects the end of the job and **before** it answers the terminal status (the task is still `RUNNING`, so DevOps accepts it). Content: the JSON report. The UI Results tab renders it with the JSON viewer; task-level policies of later tasks of the same activity see it in `activity.tasks[].results`; placeholders can read it (`${deploy-lab.results.verify-contract.summary.failedBlocking}`). No DevOps change. Cost: one more outbound dependency (DevOps address in the configuration) and two more parameters in the descriptor. If the post fails, the executor logs it and still answers the verdict: detail is lost from Results but stays in Logs.
+   - **(a) Results, PoC: the executor posts the report to DevOps** `POST /api/v2/pp/devops/activities/tasks/results`, addressed by `dataProductFqn` + version tag + `activityName` + `taskName`, during the status call that detects the end of the job and **before** it answers the terminal status (the task is still `RUNNING`, so DevOps accepts it). Content: the JSON report. The UI Results tab renders it with the JSON viewer; task-level policies of later tasks of the same activity see it in `activity.tasks[].results`; placeholders can read it (`${deploy-dev.results.verify-contract.summary.failedBlocking}`). No DevOps change. Cost: one more outbound dependency (DevOps address in the configuration) and two more parameters in the descriptor. If the post fails, the executor logs it and still answers the verdict: detail is lost from Results but stays in Logs.
    - **(b) Logs, always**: the same report as a readable table, in the logs block. No dependency. This is the guaranteed record: it exists even when (a) is not configured or its post fails, and it is recomputed identically from the agent job history on every logs call. It alone already satisfies "visible in the ODM activity", less conveniently.
    - **(c) Long term: extend the executor contract** so that `status` (terminal) or `logs` can return `results[]`, stored by Execute Task. It fixes the gap for every executor (GitLab included, BDMD-5688), removes the extra parameters and the DevOps address from executors, and removes double posts. DevOps + starter + GitLab executor change, like decision 1 of BDMD-5099. Follow-up F-1.
    - **Recommendation: (a) + (b) in this story, (c) proposed as a DevOps story.** If (a) is judged too coupled, (b) alone is acceptable for the PoC, because (b) is already a complete record. Caveat: the logs block depends on the agent job history being retained; if the agent purges history, the ODM logs call can no longer rebuild it, which is one more reason for (a) and, long term, (c) (results stored by DevOps).
@@ -241,7 +241,7 @@ sequenceDiagram
      ```json
      {
        "schema": "blindata.devops.contractVerification.v1",
-       "dataProduct": "urn:dpds:acme:dataproducts:sales:1", "version": "1.2.0", "environment": "lab",
+       "dataProduct": "urn:dpds:acme:dataproducts:sales:1", "version": "1.2.0", "environment": "dev",
        "agentRun": { "sequenceId": 1234, "runStatus": "SUCCESS", "startedAt": "…", "finishedAt": "…" },
        "verdict": "FAILED",
        "summary": { "total": 12, "passed": 9, "failed": 2, "error": 0, "skipped": 1, "failedBlocking": 1 },
@@ -285,9 +285,9 @@ sequenceDiagram
 10. **Polling and timeouts.** DevOps polls every 30 s by default; agent dry runs take seconds to a few minutes, so the DevOps defaults fit (the secrets TTL does not matter with decision 5). Outbound calls have a configurable connect timeout and the template's fixed 60 s request timeout; reads (job history and logs, Registry) are retried on 5xx and 429, the job start never.
 
 11. **Instrumented fallback and code sharing.** The fallback must be ready if the executor is not on track, and must run *the same check*.
-   - **Pipeline tool (open, Q13).** The provisioning pipeline may run on Cloud Build instead of GitLab. Options: keep Cloud Build as the pipeline tool; GitLab orchestrating Cloud Build as a step; or a Cloud Build executor in ODM. If Cloud Build stays, "the last stage of the provisioning pipeline" below is a **Cloud Build step**, not a GitLab job, and Task 1 is run by whichever executor drives Cloud Build. The F1 script (`curl` + `jq`) runs unchanged in either; what changes is network reachability from the build workers to the executor (and DevOps).
+   - **Pipeline tool (open, Q13).** The provisioning pipeline may run on a CI tool other than GitLab, either directly, orchestrated by GitLab as a step, or through its own ODM executor. Then "the last stage of the provisioning pipeline" below is a step of that tool, and Task 1 is run by whichever executor drives it. The F1 script (`curl` + `jq`) runs unchanged; what changes is network reachability from the build workers to the executor (and DevOps).
    - **Ordering constraint.** In an activity, a task can be requested only after the previous one ends. The last stage of the provisioning pipeline runs while Task 1 (provisioning, full control) is still `RUNNING`, so it **cannot** report as a separate Task 2. In the fallback, the check is part of Task 1.
-   - **F1 (recommended fallback): the last stage of the provisioning pipeline calls this executor's own HTTP API** (`start`, then `status` until terminal, then `logs`), prints the report, posts the JSON report to `/activities/tasks/results` for Task 1, and exits non-zero on `FAILED`. The pipeline fails, the provisioning executor reports Task 1 `FAILED`, its aggregated logs contain the per-rule table, and the activity fails. Zero duplicated logic: the stage is a short script (`curl` + `jq`) around the same service. Requires the GitLab runner or the Cloud Build worker to reach the executor (and DevOps for the results post).
+   - **F1 (recommended fallback): the last stage of the provisioning pipeline calls this executor's own HTTP API** (`start`, then `status` until terminal, then `logs`), prints the report, posts the JSON report to `/activities/tasks/results` for Task 1, and exits non-zero on `FAILED`. The pipeline fails, the provisioning executor reports Task 1 `FAILED`, its aggregated logs contain the per-rule table, and the activity fails. Zero duplicated logic: the stage is a short script (`curl` + `jq`) around the same service. Requires the GitLab runner or the other CI tool's worker to reach the executor (and DevOps for the results post).
    - **F2 (fully instrumented setup, no full-control executor):** the same script, and the ODM callback reports logs, results and the terminal status of an instrumented task. The ODM CLI in `~/Git/odm-cli` has no DevOps commands yet; the callback would be direct REST calls to the DevOps v2 instrumented API (`/tasks/request-execution`, `/tasks/logs`, `/tasks/results`, `/tasks/status`).
    - **Implemented:** `scripts/verify-contract.sh` (start, poll, print the logs, exit 1 on `FAILED` or `CANCELED`). The command-line entry point considered here (the same core without HTTP) was not built: F1 needs the executor service running.
 
@@ -389,19 +389,19 @@ Profiles file, mounted at `/work/config/application.yml` (reference copy in the 
 ```yaml
 blindata:
   environments:                                         # key = the `environment` pipeline parameter
-    lab:                                                # one tenant per environment, one shared agent (decision 4)
+    dev:                                                # one tenant per environment, one shared agent (decision 4)
       agent-url: ${BLINDATA_AGENT_URL}
-      tenant-uuid: ${BLINDATA_LAB_TENANT}
+      tenant-uuid: ${BLINDATA_DEV_TENANT}
       connection-name-template: "{name}"
       platform: BIGQUERY                                # decision 13: rules the agent cannot run here are rejected or skipped
       auth:
         type: API_KEY                                   # API_KEY | OAUTH2_CLIENT_CREDENTIALS (decision 5)
         api-key:
-          user: ${BLINDATA_LAB_USER}                   # observer: blindata.user
-          key: ${BLINDATA_LAB_APIKEY}                  # observer: blindata.password
-    prd:
+          user: ${BLINDATA_DEV_USER}                   # observer: blindata.user
+          key: ${BLINDATA_DEV_APIKEY}                  # observer: blindata.password
+    prod:
       agent-url: ${BLINDATA_AGENT_URL}                  # same agent, other tenant
-      tenant-uuid: ${BLINDATA_PRD_TENANT}
+      tenant-uuid: ${BLINDATA_PROD_TENANT}
       connection-name-template: "{name}"
       platform: BIGQUERY
       auth:
@@ -409,11 +409,11 @@ blindata:
         oauth2:                                         # observer: blindata.oauth2.*
           url: https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token   # e.g. Entra ID
           grant-type: client_credentials
-          scope: ${BLINDATA_PRD_OAUTH2_SCOPE}           # e.g. api://<Blindata API app id>/.default
-          client-id: ${BLINDATA_PRD_OAUTH2_CLIENT_ID}
-          client-secret: ${BLINDATA_PRD_OAUTH2_CLIENT_SECRET:}
-          client-certificate: ${BLINDATA_PRD_OAUTH2_CLIENT_CERTIFICATE:}                 # instead of the secret
-          client-certificate-private-key: ${BLINDATA_PRD_OAUTH2_CLIENT_CERTIFICATE_PRIVATE_KEY:}
+          scope: ${BLINDATA_PROD_OAUTH2_SCOPE}           # e.g. api://<Blindata API app id>/.default
+          client-id: ${BLINDATA_PROD_OAUTH2_CLIENT_ID}
+          client-secret: ${BLINDATA_PROD_OAUTH2_CLIENT_SECRET:}
+          client-certificate: ${BLINDATA_PROD_OAUTH2_CLIENT_CERTIFICATE:}                 # instead of the secret
+          client-certificate-private-key: ${BLINDATA_PROD_OAUTH2_CLIENT_CERTIFICATE_PRIVATE_KEY:}
 ```
 
 - Typed groups (`@ConfigMapping`): `odm.product-plane.*-service`, `blindata.agent`, `blindata.contract-rules`, `blindata.environments` (a map of profiles).
@@ -431,7 +431,7 @@ See [Open questions](#open-questions). The main ones: connection resolution per 
 - **Checks not yet in the environment's tenant** (first deploy to that environment, or the observer has not processed a previous success yet): no effect. The job is built from the descriptor and runs in dry run; the agent does not look up Blindata checks.
 - **Table not yet created or not visible to the agent's service account:** `CONTRACT_RULE` rows in `errors` → `ERROR` → blocking ⇒ `FAILED`. The message names the table. Correct for a contract gate, but it also fires on a D3 permission gap: the report must say "error", not "rule failed".
 - **Empty table at first deploy:** value rules may pass (`nullCount = 0`) or fail (`rowCount > 0`) for the wrong reason (Q5).
-- **No time window.** The agent has no filter for `library` rules and TEST RULES drops `customProperties`, so a window key cannot be expressed today. Library metrics scan the whole table on every deploy: slow and costly on high-frequency tables (e.g. a row per grid point every few minutes). Such rules must be `sql` rules on the latest partition (e.g. `WHERE _PARTITIONTIME = (SELECT MAX(...))` or the table's partition column). Follow-up F-7.
+- **No time window.** The agent has no filter for `library` rules and TEST RULES drops `customProperties`, so a window key cannot be expressed today. Library metrics scan the whole table on every deploy: slow and costly on high-frequency tables (e.g. event or sensor data loaded every few minutes). Such rules must be `sql` rules on the latest partition (e.g. `WHERE _PARTITIONTIME = (SELECT MAX(...))` or the table's partition column). Follow-up F-7.
 - **`invalidValues` with `pattern` on BigQuery, or an identifier outside `[a-zA-Z0-9_]+`:** blocking ⇒ start rejected with the rule and the `sql` equivalent; non-blocking ⇒ `SKIPPED` (decision 13).
 - **Nullable column with an `invalidValues` rule:** nulls count as invalid; the report states it so the failure is not read as a bad value.
 - **Port without `x-blindataConnectionName`:** rules `SKIPPED`, reported. Same opt-in rule as the observer.
@@ -451,13 +451,13 @@ See [Open questions](#open-questions). The main ones: connection resolution per 
 
 ### Technical Risks
 
-- **T1, schedule.** The full scope does not fit the PoC timeline, with D4 (agent BigQuery connection per tenant, BDMD-5757), D3 (service account), the PoC tenant (BDMD-5690) and D5 (structural check) as dependencies. Since this is the only quality gate, slipping it leaves the demo with no gate. Mitigation: build in the order of the estimate below, keep F1 ready (it reuses the same service), and decide at a checkpoint where F1 would run (GitLab or Cloud Build, Q13).
+- **T1, schedule.** The full scope does not fit the PoC timeline, with D4 (agent BigQuery connection per tenant, BDMD-5757), D3 (service account), the PoC tenant (BDMD-5690) and D5 (structural check) as dependencies. Since this is the only quality gate, slipping it leaves the demo with no gate. Mitigation: build in the order of the estimate below, keep F1 ready (it reuses the same service), and decide at a checkpoint where F1 would run (GitLab or another CI tool, Q13).
 - **T2, rule metadata in `jobDetails`.** **Verified** on the local stack: the agent keeps the `odm` fields of `configs` in the history, and the blocking flags came back intact.
 - **T3, descriptor parsing parity.** Reduced: parsing uses the same parser library as the observer; only the mapping is re-implemented. Mitigation: shared fixtures; the ODCS plugin can move to a shared library (F-3).
 - **T4, network and auth to the agent.** The agent must be reachable from the executor and accept the technical user. Covered by BDMD-5757 AC 3.
 - **T9, agent SQL limits on BigQuery.** `invalidValues` with `pattern` and non-`[a-zA-Z0-9_]` identifiers fail on BigQuery (decision 13). Mitigation: checked at start against the profile's platform; descriptor convention (`sql` rules); F-6 in the agent.
 - **T8, Entra setup across two organisations.** The app registration (secret or certificate) and its permission on the Blindata API app live in the organisation's Entra; the `msazure:<oid>@<tid>` user, its roles and the tenant's Azure auth configuration live in each Blindata tenant. The observer already runs this way against the Blindata API, but the executor → agent → API chain with a service principal is untested. Mitigation: verify once on a test tenant early (Q11); API key stays as fallback.
-- **T5, the stage-transition policy on DevOps v2.** The `lab` → `prd` gate (BDMD-5651) relies only on this task's `FAILED` / `SUCCEEDED` outcome, which fails or completes the `lab` activity. On DevOps v2 it must be written as a policy on the `prd` activity request (`otherActivities`: the latest `deploy-lab` activity succeeded), not on `ACTIVITY_STAGE_TRANSITION`, which v2 does not send. To align with BDMD-5651 (Q9).
+- **T5, the stage-transition policy on DevOps v2.** The `dev` → `prod` gate (BDMD-5651) relies only on this task's `FAILED` / `SUCCEEDED` outcome, which fails or completes the `dev` activity. On DevOps v2 it must be written as a policy on the `prod` activity request (`otherActivities`: the latest `deploy-dev` activity succeeded), not on `ACTIVITY_STAGE_TRANSITION`, which v2 does not send. To align with BDMD-5651 (Q9).
 - **T6, results coupling (decision 6a).** The executor depends on DevOps and on descriptor-literal activity and task names. Mitigation: optional (`odm.product-plane.devops-service.active: false` ⇒ logs only), and F-1 removes it.
 - **T7, native image.** The descriptor model (library and ODCS plugin classes) is registered for reflection; the other JSON is read as `JsonNode`. The native build has not been run yet.
 
@@ -470,7 +470,7 @@ See [Open questions](#open-questions). The main ones: connection resolution per 
 | 3 | Per-rule detail visible in the ODM activity | Yes | The ODM task is the place of record (results stay out of Blindata). Logs always (6b); Results tab via the results post (6a). The clean fix is F-1. |
 | 4 | Job built from the descriptor like TEST RULES, in `dryRun` | Yes | Decision 3: parser library, ODCS plugin, visitors; observer parity for codes and bindings. |
 | 5 | Structural check (D5) in the same job | Partial | Depends on BDMD-5756's probe type; the job carries it when available. |
-| 6 | FAILED blocks `lab` → `prd` | Yes, outside this repo | The `lab` activity fails; the gate is the D9 policy (BDMD-5651), written on `otherActivities` (T5). |
+| 6 | FAILED blocks `dev` → `prod` | Yes, outside this repo | The `dev` activity fails; the gate is the D9 policy (BDMD-5651), written on `otherActivities` (T5). |
 | 7 | Instrumented fallback with the same check | Yes | Decision 11: `scripts/verify-contract.sh` (not run yet). |
 
 ## Test strategy
@@ -486,7 +486,7 @@ Following `spdd/norms/TESTING.md`. What exists (54 tests, `./mvnw verify`):
   - provider run id (`ProviderRunIdTest`); startup validation (`ExecutorBlindataConfigValidatorTest`);
   - use cases with fake ports (`StartTaskTest`, `ReadTaskStatusTest`): 400s, rejection of blocking unsupported rules, connection template, results post and its failure.
 - **Integration (`*IT`, application running):** one JDK HTTP stub (`RemoteStub`) for the Registry, the agent, an OAuth2 token endpoint and DevOps: start with API key and with OAuth2 bearer, the BigQuery rejection, 400 / 404 / 409 / 502 contracts, every status outcome, the results post and its refusal, the logs table with the agent log, cancel; secrets never in error messages.
-- **Manual end to end, done on the local stack** (Blindata API and agent, Registry v2, Notification, DevOps v2, Postgres standing in for BigQuery): a DevOps `deploy-lab` activity ran the task, `FAILED` on a blocking NULL-key rule and `SUCCEEDED` after fixing the data, with the report in the task's results and logs; a `BIGQUERY` profile skipped a non-blocking `pattern` rule. It found two bugs, fixed (agent log line breaks, test HTTP port).
+- **Manual end to end, done on the local stack** (Blindata API and agent, Registry v2, Notification, DevOps v2, Postgres standing in for BigQuery): a DevOps `deploy-dev` activity ran the task, `FAILED` on a blocking NULL-key rule and `SUCCEEDED` after fixing the data, with the report in the task's results and logs; a `BIGQUERY` profile skipped a non-blocking `pattern` rule. It found two bugs, fixed (agent log line breaks, test HTTP port).
 - **Not done:** the snapshot against a TEST RULES job captured from the UI; the replay of DevOps's `ExecutorClientImplTest`; the F1 script run; OAuth2 against a real identity provider; a BigQuery connection; the native build.
 
 ## Rough estimate
@@ -505,7 +505,7 @@ Following `spdd/norms/TESTING.md`. What exists (54 tests, `./mvnw verify`):
 | Structural check integration once D5 is defined | +0.5 |
 | F1 fallback script on top of the executor | 0.5–1 |
 
-The table is the planning estimate (revisions 2–4); it is kept for reference. Revision 4 adds the platform-limits check (decision 13) to the descriptor → rules line. Revision 3 adds the credentials-port line (OAuth). Revision 2 changed no line: the shared agent and the tenant profile cost the same as per-environment agents, and dropping BDMD-5717 removes a dependency of the wider PoC, not work of this story. The full scope still does not fit the the PoC timeline with the dependencies above. **Minimal slice for the PoC (≈5 days):** one environment profile (`lab`), the decision 13 checks (without them every deploy with a `pattern` rule fails), credentials port with API key; OAuth2 in the slice if Q11 says the PoC environment authenticates Blindata with Entra, otherwise right after, rules only (no structural check), complete report in logs (no 6a; the logs are then the only record of the run, which meets the "ODM only" decision as long as the agent keeps job history), ITs on the happy path and the blocking failure. **Recommended if a day is left (≈5 days):** add 6a, so the record lives in DevOps and survives agent history cleanup. At the checkpoint: if start → status → logs does not work against a real agent by then, prepare F1 (which reuses whatever core exists, or the CLI entry point of decision 11).
+The table is the planning estimate (revisions 2–4); it is kept for reference. Revision 4 adds the platform-limits check (decision 13) to the descriptor → rules line. Revision 3 adds the credentials-port line (OAuth). Revision 2 changed no line: the shared agent and the tenant profile cost the same as per-environment agents, and dropping BDMD-5717 removes a dependency of the wider PoC, not work of this story. The full scope still does not fit the the PoC timeline with the dependencies above. **Minimal slice for the PoC (≈5 days):** one environment profile (`dev`), the decision 13 checks (without them every deploy with a `pattern` rule fails), credentials port with API key; OAuth2 in the slice if Q11 says the PoC environment authenticates Blindata with Entra, otherwise right after, rules only (no structural check), complete report in logs (no 6a; the logs are then the only record of the run, which meets the "ODM only" decision as long as the agent keeps job history), ITs on the happy path and the blocking failure. **Recommended if a day is left (≈5 days):** add 6a, so the record lives in DevOps and survives agent history cleanup. At the checkpoint: if start → status → logs does not work against a real agent by then, prepare F1 (which reuses whatever core exists, or the CLI entry point of decision 11).
 
 ## Follow-ups (outside this story)
 
@@ -530,10 +530,10 @@ The implementation follows the recommendations below where a question is still o
 6. **Fail-closed:** confirm that `ERROR` on a blocking rule fails the task, and that zero executable rules is `SUCCEEDED` with a warning (D9 blocks "no rules" earlier).
 7. **Per-rule detail mechanism** (*implemented as recommended: results post and logs*): the ODM task is now the only record of the deploy-time check. Logs only for the PoC (depends on agent job history retention), or results post to DevOps too (6a, needs `activityName` / `taskName` in the descriptor)? And open F-1 as a DevOps story now?
 8. **Repository and name:** *answered*: `opendatamesh-initiative/odm-platform-adapter-devops-executor-blindata`, public; the image goes to the GitHub registry through the inherited `cicd.yml`.
-9. **Stage-transition policy (BDMD-5651):** it relies on this task's `FAILED` / `SUCCEEDED` outcome. Confirm it is written on DevOps v2 as a policy on the `prd` activity request reading `otherActivities` (latest `deploy-lab` activity succeeded), since v2 does not send `ACTIVITY_STAGE_TRANSITION`.
+9. **Stage-transition policy (BDMD-5651):** it relies on this task's `FAILED` / `SUCCEEDED` outcome. Confirm it is written on DevOps v2 as a policy on the `prod` activity request reading `otherActivities` (latest `deploy-dev` activity succeeded), since v2 does not send `ACTIVITY_STAGE_TRANSITION`.
 10. **Credentials:** technical Blindata identity per environment from configuration (decision 5), or per-request DevOps secrets?
 11. **OAuth2 for the executor:** does the PoC environment authenticate Blindata with Entra ID? Can the executor reuse the observer's app registration and Blindata user per tenant, or does it need its own (separate audit trail)? Secret or certificate? Is OAuth2 needed for the PoC or right after? Which other IdPs must the Blindata API accept later (F-5)?
-12. **Environment and stage names:** the examples use `lab` and `prd`. Confirm the ODM stage names used in the activities (`deploy-lab`, `deploy-prd`), in the observers' stage filters and in the D9 stage-transition policy.
-13. **Pipeline tool for provisioning:** Cloud Build stays, GitLab orchestrates Cloud Build as a step, or a Cloud Build executor in ODM? It decides where F1's step runs and which executor runs Task 1.
+12. **Environment and stage names:** the examples use `dev` and `prod`. Confirm the ODM stage names used in the activities (`deploy-dev`, `deploy-prod`), in the observers' stage filters and in the D9 stage-transition policy.
+13. **Pipeline tool for provisioning:** GitLab, another CI tool directly, GitLab orchestrating it as a step, or an ODM executor for it? It decides where F1's step runs and which executor runs Task 1.
 14. **BigQuery limits (decision 13)** (*implemented as recommended*): confirm "reject at start for blocking rules the agent cannot run, `SKIPPED` for non-blocking", and the `sql`-only convention for `pattern` rules on BigQuery. Open F-6 in the agent now?
 15. **Value rules at deploy:** with this executor as the only gate, which rules are blocking at deploy (Q5), and must high-frequency tables use `sql` rules on the latest partition until F-7?

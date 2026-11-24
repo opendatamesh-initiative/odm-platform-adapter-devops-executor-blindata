@@ -26,7 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class RemoteStub implements AutoCloseable {
 
     public static final long SEQUENCE_ID = 42;
-    public static final String TOKEN = "prd-access-token";
+    public static final String TOKEN = "prod-access-token";
 
     public record Recorded(String method, String pathWithQuery, String body, Map<String, String> headers) {
 

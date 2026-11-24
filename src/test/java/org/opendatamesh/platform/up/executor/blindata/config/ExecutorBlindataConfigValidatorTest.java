@@ -20,20 +20,20 @@ class ExecutorBlindataConfigValidatorTest {
 
     @Test
     void whenAProfileIsIncompleteThenStartupFailsNamingTheKey() {
-        assertFails(p -> p.remove("blindata.environments.lab.tenant-uuid"), "blindata.environments.lab.tenant-uuid");
-        assertFails(p -> p.remove("blindata.environments.lab.auth.api-key.key"), "blindata.environments.lab.auth.api-key.key");
-        assertFails(p -> p.remove("blindata.environments.prd.auth.oauth2.client-secret"), "blindata.environments.prd.auth.oauth2");
-        assertFails(p -> p.remove("blindata.environments.prd.auth.type"), "blindata.environments.prd.auth.type");
-        assertFails(p -> p.put("blindata.environments.lab.agent-url", "agent:8082"), "blindata.environments.lab.agent-url");
-        assertFails(p -> p.put("blindata.environments.lab.connection-name-template", "fixed"), "connection-name-template");
+        assertFails(p -> p.remove("blindata.environments.dev.tenant-uuid"), "blindata.environments.dev.tenant-uuid");
+        assertFails(p -> p.remove("blindata.environments.dev.auth.api-key.key"), "blindata.environments.dev.auth.api-key.key");
+        assertFails(p -> p.remove("blindata.environments.prod.auth.oauth2.client-secret"), "blindata.environments.prod.auth.oauth2");
+        assertFails(p -> p.remove("blindata.environments.prod.auth.type"), "blindata.environments.prod.auth.type");
+        assertFails(p -> p.put("blindata.environments.dev.agent-url", "agent:8082"), "blindata.environments.dev.agent-url");
+        assertFails(p -> p.put("blindata.environments.dev.connection-name-template", "fixed"), "connection-name-template");
     }
 
     @Test
     void whenACertificateReplacesTheSecretThenStartupPasses() {
         Map<String, String> properties = TestConfigs.valid();
-        properties.remove("blindata.environments.prd.auth.oauth2.client-secret");
-        properties.put("blindata.environments.prd.auth.oauth2.client-certificate", "-----BEGIN CERTIFICATE-----");
-        properties.put("blindata.environments.prd.auth.oauth2.client-certificate-private-key", "-----BEGIN PRIVATE KEY-----");
+        properties.remove("blindata.environments.prod.auth.oauth2.client-secret");
+        properties.put("blindata.environments.prod.auth.oauth2.client-certificate", "-----BEGIN CERTIFICATE-----");
+        properties.put("blindata.environments.prod.auth.oauth2.client-certificate-private-key", "-----BEGIN PRIVATE KEY-----");
 
         assertDoesNotThrow(() -> validator(properties).validate());
     }

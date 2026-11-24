@@ -2,23 +2,23 @@
 
 ## Where the executor sits
 
-One ODM platform serves every environment. Each environment (for example `lab` and `prd`, one GCP project each) has its own Blindata **tenant**; one Blindata **agent** can serve all tenants. The executor is a single service: an **environment profile** tells it, for each environment, which agent, tenant, credentials and connection naming to use.
+One ODM platform serves every environment. Each environment (for example `dev` and `prod`, one GCP project each) has its own Blindata **tenant**; one Blindata **agent** can serve all tenants. The executor is a single service: an **environment profile** tells it, for each environment, which agent, tenant, credentials and connection naming to use.
 
 ```mermaid
 flowchart TB
   subgraph ODM[ODM platform, shared]
     REG[Registry v2]
     DEV[DevOps v2]
-    EX[Blindata executor<br/>profiles: lab, prd]
+    EX[Blindata executor<br/>profiles: dev, prod]
   end
   AG[Blindata agent, shared<br/>multi-tenant]
-  subgraph LAB[Environment lab]
-    T1[(Blindata tenant lab)]
-    B1[(Data of lab)]
+  subgraph DEV[Environment dev]
+    T1[(Blindata tenant dev)]
+    B1[(Data of dev)]
   end
-  subgraph PRD[Environment prd]
-    T2[(Blindata tenant prd)]
-    B2[(Data of prd)]
+  subgraph PROD[Environment prod]
+    T2[(Blindata tenant prod)]
+    B2[(Data of prod)]
   end
   DEV -->|task API| EX
   EX -->|descriptor| REG
@@ -44,16 +44,16 @@ sequenceDiagram
   EX->>EX: read rules, map connections, check what the agent can run
   EX->>AG: run QUALITY_PROBES job, dryRun: true
   AG-->>EX: sequenceId 1234
-  EX-->>DevOps: providerRunId "lab:1234"
+  EX-->>DevOps: providerRunId "dev:1234"
   loop every polling interval
-    DevOps->>EX: status ("lab:1234")
+    DevOps->>EX: status ("dev:1234")
     EX->>AG: job history 1234
     EX-->>DevOps: RUNNING
   end
   EX->>EX: per-rule outcomes, verdict
   EX->>DevOps: task results: JSON report
   EX-->>DevOps: SUCCEEDED or FAILED
-  DevOps->>EX: logs ("lab:1234")
+  DevOps->>EX: logs ("dev:1234")
   EX-->>DevOps: report table + agent job log
 ```
 

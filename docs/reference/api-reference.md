@@ -16,14 +16,14 @@ The executor implements the DevOps v2 executor API. All calls are `POST` with a 
   "executorParameters": { "ref": { "name": "v1.2.0", "type": "TAG" } },
   "pipelineParameters": {
     "dataProductFqn": "urn:dpds:acme:dataproducts:orders:1",
-    "environment": "lab",
-    "activityName": "deploy-lab",
+    "environment": "dev",
+    "activityName": "deploy-dev",
     "taskName": "verify-contract"
   }
 }
 ```
 
-`executorParameters.ref.name` is the release tag of the version; `pipelineParameters` are described in [DevOps setup](devops-setup.md#declare-the-task). The answer is `{ "providerRunId": "lab:1234" }`: the environment and the agent job's sequence id.
+`executorParameters.ref.name` is the release tag of the version; `pipelineParameters` are described in [DevOps setup](devops-setup.md#declare-the-task). The answer is `{ "providerRunId": "dev:1234" }`: the environment and the agent job's sequence id.
 
 ## status
 
@@ -35,7 +35,7 @@ The executor implements the DevOps v2 executor API. All calls are `POST` with a 
 
 ```text
 === Contract verification: FAILED ===
-Data product: urn:dpds:acme:dataproducts:orders:1  version: 1.2.0  environment: lab
+Data product: urn:dpds:acme:dataproducts:orders:1  version: 1.2.0  environment: dev
 Agent job: 1234 (SUCCESS)
 Rules: 9 total, 4 passed, 2 failed, 0 error, 3 skipped; 1 blocking failure(s)
 

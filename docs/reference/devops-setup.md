@@ -25,7 +25,7 @@ In the descriptor, add the task after the provisioning task of each deploy activ
 
 ```yaml
 lifecycleInfo:
-  deploy-lab:
+  deploy-dev:
     - name: provisioning
       service: { $href: gitlab }
       # ...
@@ -35,10 +35,10 @@ lifecycleInfo:
       configurations:
         params:
           dataProductFqn: urn:dpds:acme:dataproducts:orders:1
-          environment: lab
-          activityName: deploy-lab
+          environment: dev
+          activityName: deploy-dev
           taskName: verify-contract
-  deploy-prd:
+  deploy-prod:
     - name: provisioning
       service: { $href: gitlab }
     - name: verify-contract
@@ -47,8 +47,8 @@ lifecycleInfo:
       configurations:
         params:
           dataProductFqn: urn:dpds:acme:dataproducts:orders:1
-          environment: prd
-          activityName: deploy-prd
+          environment: prod
+          activityName: deploy-prod
           taskName: verify-contract
 ```
 
@@ -63,16 +63,16 @@ DevOps requires a repository in the task's executor parameters (`dataProductRepo
 
 ## Gate the next stage
 
-A failed verification fails the task, which fails the activity. To stop `deploy-prd` until `deploy-lab` has succeeded, write a policy on the `deploy-prd` activity request that reads `otherActivities` and requires the latest `deploy-lab` to be `SUCCEEDED`. DevOps v2 does not send a separate stage-transition event.
+A failed verification fails the task, which fails the activity. To stop `deploy-prod` until `deploy-dev` has succeeded, write a policy on the `deploy-prod` activity request that reads `otherActivities` and requires the latest `deploy-dev` to be `SUCCEEDED`. DevOps v2 does not send a separate stage-transition event.
 
 ```mermaid
 flowchart LR
-  L[deploy-lab] -->|verify-contract SUCCEEDED| OK[deploy-lab SUCCEEDED]
-  L -->|blocking rule failed| KO[deploy-lab FAILED]
-  OK --> P{Policy on deploy-prd:<br/>latest deploy-lab succeeded?}
+  L[deploy-dev] -->|verify-contract SUCCEEDED| OK[deploy-dev SUCCEEDED]
+  L -->|blocking rule failed| KO[deploy-dev FAILED]
+  OK --> P{Policy on deploy-prod:<br/>latest deploy-dev succeeded?}
   KO --> P
-  P -->|yes| PRD[deploy-prd runs]
-  P -->|no| STOP[deploy-prd refused]
+  P -->|yes| PROD[deploy-prod runs]
+  P -->|no| STOP[deploy-prod refused]
 ```
 
 ## The report in DevOps
@@ -82,7 +82,7 @@ When the run ends, the executor posts one result to the task, a JSON document:
 ```json
 {
   "schema": "blindata.devops.contractVerification.v1",
-  "dataProduct": "urn:dpds:acme:dataproducts:orders:1", "version": "1.2.0", "environment": "lab",
+  "dataProduct": "urn:dpds:acme:dataproducts:orders:1", "version": "1.2.0", "environment": "dev",
   "agentRun": { "sequenceId": 1234, "runStatus": "SUCCESS", "startedAt": "…", "finishedAt": "…" },
   "verdict": "FAILED",
   "summary": { "total": 9, "passed": 4, "failed": 2, "error": 0, "skipped": 3, "failedBlocking": 1 },

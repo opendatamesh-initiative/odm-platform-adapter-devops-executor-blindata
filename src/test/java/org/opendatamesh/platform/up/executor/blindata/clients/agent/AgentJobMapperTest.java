@@ -44,7 +44,7 @@ class AgentJobMapperTest {
         assertEquals("sales", query.at("/physicalBinding/schema").asText());
         assertEquals("order_id", query.at("/physicalBinding/property").asText());
         assertFalse(check.at("/odm/blocking").asBoolean(true));
-        assertEquals("deploy-lab", job.at("/configs/odm/activityName").asText());
+        assertEquals("deploy-dev", job.at("/configs/odm/activityName").asText());
     }
 
     /** Scenario: the status call reads the rules, the skipped rules and the context back from the job history. */
@@ -75,7 +75,7 @@ class AgentJobMapperTest {
                 "urn:port", "sales", "orders", "order_id", "bq-sales", "library", false, ContractRuleKind.RULE,
                 Fixtures.JSON.createObjectNode().put("type", "library").put("metric", "nullValues").put("mustBe", 0));
         SkippedRule skipped = new SkippedRule(null, null, "rule_without_id", "urn:port", "orders", null, true, "no id");
-        return new ContractJob(new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "lab", "deploy-lab",
+        return new ContractJob(new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "dev", "deploy-dev",
                 "verify-contract"), List.of(rule), List.of(skipped));
     }
 }

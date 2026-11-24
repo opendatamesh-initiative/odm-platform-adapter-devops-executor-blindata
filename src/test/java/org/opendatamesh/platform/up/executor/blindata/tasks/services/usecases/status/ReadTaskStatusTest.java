@@ -28,10 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** BDMD-5755 decisions 6 and 7: status, verdict and the results post, with fake ports. */
 class ReadTaskStatusTest {
 
-    private static final EnvironmentProfile LAB = new EnvironmentProfile("lab", "http://agent", "t", "{name}",
+    private static final EnvironmentProfile DEV = new EnvironmentProfile("dev", "http://agent", "t", "{name}",
             Platform.GENERIC, new BlindataCredentials.ApiKey("u", "k"));
     private static final VerificationContext CONTEXT =
-            new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "lab", "deploy-lab", "verify-contract");
+            new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "dev", "deploy-dev", "verify-contract");
 
     private final List<VerificationReport> published = new ArrayList<>();
     private RunStatus presented;
@@ -39,7 +39,7 @@ class ReadTaskStatusTest {
     /** Scenario: a running job is RUNNING and nothing is posted. */
     @Test
     void whenTheJobIsRunningThenRunningAndNoPost() {
-        status("lab:7", Optional.of(run(AgentRunStatus.RUNNING, CONTEXT, List.of())), false);
+        status("dev:7", Optional.of(run(AgentRunStatus.RUNNING, CONTEXT, List.of())), false);
 
         assertEquals(RunStatus.RUNNING, presented);
         assertTrue(published.isEmpty());
@@ -52,7 +52,7 @@ class ReadTaskStatusTest {
      */
     @Test
     void whenTheJobEndedWithAFailedBlockingRuleThenTheReportIsPostedAndFailed() {
-        status("lab:7", Optional.of(run(AgentRunStatus.SUCCESS, CONTEXT, List.of(new AgentCheckResult("a", 1.0, 1.0, 0, null)))), false);
+        status("dev:7", Optional.of(run(AgentRunStatus.SUCCESS, CONTEXT, List.of(new AgentCheckResult("a", 1.0, 1.0, 0, null)))), false);
 
         assertEquals(RunStatus.FAILED, presented);
         assertEquals(1, published.size());
@@ -62,7 +62,7 @@ class ReadTaskStatusTest {
     /** Scenario: a failing results post does not change the verdict. */
     @Test
     void whenTheResultsPostFailsThenTheVerdictIsStillAnswered() {
-        status("lab:7", Optional.of(run(AgentRunStatus.SUCCESS, CONTEXT, List.of(new AgentCheckResult("a", 1.0, 1.0, 100, null)))), true);
+        status("dev:7", Optional.of(run(AgentRunStatus.SUCCESS, CONTEXT, List.of(new AgentCheckResult("a", 1.0, 1.0, 100, null)))), true);
 
         assertEquals(RunStatus.SUCCEEDED, presented);
     }
@@ -70,8 +70,8 @@ class ReadTaskStatusTest {
     /** Scenario: without activity and task names the report is not posted. */
     @Test
     void whenTheJobHasNoActivityNameThenTheReportIsNotPosted() {
-        VerificationContext noNames = new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "lab", null, null);
-        status("lab:7", Optional.of(run(AgentRunStatus.SUCCESS, noNames, List.of(new AgentCheckResult("a", 1.0, 1.0, 100, null)))), false);
+        VerificationContext noNames = new VerificationContext(Fixtures.ORDERS_FQN, "1.2.0", "v1.2.0", "dev", null, null);
+        status("dev:7", Optional.of(run(AgentRunStatus.SUCCESS, noNames, List.of(new AgentCheckResult("a", 1.0, 1.0, 100, null)))), false);
 
         assertEquals(RunStatus.SUCCEEDED, presented);
         assertTrue(published.isEmpty());
@@ -81,14 +81,14 @@ class ReadTaskStatusTest {
     @Test
     void whenTheRunCannotBeFoundThenTheErrorFollowsTheContract() {
         assertThrows(BadRequestException.class, () -> status("7", Optional.empty(), false));
-        assertThrows(BadRequestException.class, () -> status("prd:7", Optional.empty(), false));
-        assertThrows(NotFoundException.class, () -> status("lab:7", Optional.empty(), false));
-        assertThrows(NotFoundException.class, () -> status("lab:7", Optional.of(run(AgentRunStatus.SUCCESS, null, List.of())), false));
+        assertThrows(BadRequestException.class, () -> status("prod:7", Optional.empty(), false));
+        assertThrows(NotFoundException.class, () -> status("dev:7", Optional.empty(), false));
+        assertThrows(NotFoundException.class, () -> status("dev:7", Optional.of(run(AgentRunStatus.SUCCESS, null, List.of())), false));
     }
 
     private void status(String runId, Optional<AgentRun> run, boolean postFails) {
         new ReadTaskStatus(new ReadTaskStatusCommand(runId), (id, status) -> presented = status,
-                environment -> "lab".equals(environment) ? Optional.of(LAB) : Optional.empty(),
+                environment -> "dev".equals(environment) ? Optional.of(DEV) : Optional.empty(),
                 (profile, sequenceId) -> run,
                 new ReadTaskStatusResultsOutboundPort() {
                     @Override

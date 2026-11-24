@@ -39,8 +39,8 @@ auth:
     url: https://login.microsoftonline.com/<entra-tenant-id>/oauth2/v2.0/token
     grant-type: client_credentials
     scope: api://<blindata-api-app-id>/.default
-    client-id: ${BLINDATA_PRD_OAUTH2_CLIENT_ID}
-    client-secret: ${BLINDATA_PRD_OAUTH2_CLIENT_SECRET}
+    client-id: ${BLINDATA_PROD_OAUTH2_CLIENT_ID}
+    client-secret: ${BLINDATA_PROD_OAUTH2_CLIENT_SECRET}
 ```
 
 For a certificate, set `client-certificate` and `client-certificate-private-key` (PEM, PKCS#8) instead of `client-secret`: the executor sends a signed client assertion. The Blindata API accepts its own tokens and Entra ID v2 tokens; other identity providers are not accepted by the API today.
@@ -50,7 +50,7 @@ For a certificate, set `client-certificate` and `client-certificate-private-key`
 Each rule runs on the connection named in the port's `x-blindataConnectionName`. That name must resolve in the agent for each environment:
 
 - **Connections scoped per tenant** (one tenant per environment): create in each tenant a connection with the same name, pointing to that environment's data. Leave `connection-name-template: "{name}"`.
-- **Shared connection catalogue**: create one connection per environment, for example `sales-dwh-lab` and `sales-dwh-prd`, and set `connection-name-template: "{name}-{environment}"`.
+- **Shared connection catalogue**: create one connection per environment, for example `sales-dwh-dev` and `sales-dwh-prod`, and set `connection-name-template: "{name}-{environment}"`.
 
 The agent's service account needs read access to the datasets of the data product. On BigQuery, the connection's default project is the environment's project, and the descriptor's `databaseSchemaName` is the dataset.
 
