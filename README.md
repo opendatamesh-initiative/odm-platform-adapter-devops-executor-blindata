@@ -1,164 +1,95 @@
-# ODM Platform DevOps Executor Starter
+# ODM Platform DevOps Executor for Blindata
 
-> Reference implementation of the DevOps executor v2 API for the [Open Data Mesh Platform](https://dpds.opendatamesh.org/) —
-> a stateless executor that simulates pipeline runs for end-to-end tests and demos.
+> Run the **ODCS data contract declared in a data product descriptor** with the **Blindata agent**, as a task of the [Open Data Mesh Platform](https://dpds.opendatamesh.org/) DevOps deploy: the contract's quality rules are checked on the data just deployed, and the deploy fails when a blocking rule fails.
 
-<p align="center">
-  <a href="https://github.com/opendatamesh-initiative/odm-platform-adapter-devops-executor-starter/actions/workflows/ci.yml"><img src="https://github.com/opendatamesh-initiative/odm-platform-adapter-devops-executor-starter/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
-</p>
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00.svg?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Quarkus 3.40](https://img.shields.io/badge/Quarkus-3.40-4695EB.svg?style=flat-square&logo=quarkus&logoColor=white)](https://quarkus.io/)
 
-<p align="center">
-  <a href="https://openjdk.org/"><img src="https://img.shields.io/badge/Java-21-ED8B00.svg?style=flat-square&logo=openjdk&logoColor=white" alt="Java 21"></a>
-  <a href="https://quarkus.io/"><img src="https://img.shields.io/badge/Quarkus-3.40-4695EB.svg?style=flat-square&logo=quarkus&logoColor=white" alt="Quarkus 3.40"></a>
-</p>
+## What it does
 
-<p align="center">
-  <a href="#what-the-starter-does">What the starter does</a> ·
-  <a href="#quick-start-local">Quick start</a> ·
-  <a href="#run-with-docker">Docker</a> ·
-  <a href="#executor-api">Executor API</a> ·
-  <a href="#simulation">Simulation</a> ·
-  <a href="#contributing">Contributing</a>
-</p>
+The data contract of a data product lives in its descriptor: the ODCS 3.1 `quality` rules of the tables and columns of each output port. This executor lets you **run that contract with the Blindata agent**, with no extra definition in Blindata or in the pipeline. When a version is deployed to an environment, a **"verify contract"** task runs after the provisioning task. DevOps hands it to this executor, which:
 
----
+1. reads the version's descriptor from the ODM **Registry**;
+2. turns its executable rules into one **dry-run** job of `CONTRACT_RULE` probes and runs it on the **Blindata agent**, against the tables just deployed;
+3. answers **`SUCCEEDED`** or **`FAILED`**: the task fails when a **blocking** rule fails, and the activity fails with it, so the next stage (for example prod) cannot start;
+4. leaves the **per-rule report** in the task's results and logs.
 
-## What the starter does
-
-The [DevOps server](https://github.com/opendatamesh-initiative/odm-platform-pp-devops-server) does not run pipelines itself: it calls an **executor** to start a pipeline, follow its status and logs, and cancel it. This starter is a ready-to-run executor that **simulates** those runs.
-
-- Runs live **in memory** and are dropped when the process stops. There is no database: `quarkus.datasource.active` and `quarkus.hibernate-orm.active` are `false`.
-- Each run stays `RUNNING` for a planned duration, then reports a planned outcome. Both are configurable, globally or per run.
-- Use it to test the DevOps server end to end, to demo the platform, or as a **base to build a real executor**.
-
----
-
-## Quick start (local)
-
-**Requirements:** Java **21** · Maven **3.9+** (or the included `./mvnw`)
-
-```bash
-git clone https://github.com/opendatamesh-initiative/odm-platform-adapter-devops-executor-starter.git
-cd odm-platform-adapter-devops-executor-starter
-
-./mvnw quarkus:dev
+```mermaid
+flowchart LR
+  D[Deploy activity<br/>in ODM DevOps] -->|task 1| P[Provisioning<br/>GitLab executor]
+  D -->|task 2: verify contract| E[Blindata executor]
+  E -->|descriptor of the version| R[ODM Registry]
+  E -->|dry-run job, environment profile| A[Blindata agent]
+  A -->|CONTRACT_RULE probes| DB[(Deployed tables<br/>e.g. BigQuery)]
+  E -.->|SUCCEEDED / FAILED<br/>+ per-rule report| D
 ```
 
-The executor listens on port **9080** (`quarkus.http.port` in `application.yaml`).
+Nothing is written to Blindata at deploy time. Each environment's Blindata observer creates tables, checks and scheduled probes in its own tenant only **after** the deploy succeeds; the report in ODM is the record of every deploy-time check, failed ones included.
 
-Other builds:
+## Which ODCS constructs run
 
-```bash
-./mvnw package                                  # runner in target/quarkus-app/
-java -jar target/quarkus-app/quarkus-run.jar
+| ODCS construct | Supported |
+|:--|:--|
+| Rule types | `library`, `sql` (`text` and `custom` are reported as skipped) |
+| Library metrics | `rowCount`, `nullValues`, `missingValues`, `invalidValues` (`validValues`, `pattern`), `duplicateValues` (column, or several columns) |
+| Operators | `mustBe`, `mustNotBe`, `mustBeGreaterThan`, `mustBeGreaterOrEqualTo`, `mustBeLessThan`, `mustBeLessOrEqualTo`, `mustBeBetween`, `mustNotBeBetween` (one per rule) |
+| Units | `rows`, `percent` |
+| SQL rules | any query returning one number, with `{object}` and `{property}` placeholders |
+| Levels | table (`quality`) and column (`properties.<column>.quality`) |
+| Blocking | blocking by default; `customProperties` `blocking: false` makes a rule non-blocking |
 
-./mvnw test                                     # @QuarkusTest; %test sets executor.simulation.run-duration to 200ms
-```
+Details, examples and platform limits (for example `pattern` on BigQuery): [ODCS support](docs/reference/odcs-support.md).
 
----
+## Capabilities
 
-## Run with Docker
+- **One source of truth.** The rules are the ODCS `quality` rules of the descriptor, read the same way as the Blindata observer and TEST RULES in the Builder: same check codes, same physical binding.
+- **Blocking and non-blocking rules.** A rule is blocking unless its `customProperties` say `blocking: false`; non-blocking failures are reported without failing the deploy.
+- **Fail-closed.** A blocking rule that cannot be measured (missing table, SQL error, no result) fails the task too.
+- **Checked before running.** Rules the agent cannot run on the environment's platform (for example a regex rule on BigQuery) are refused at start, with the SQL rule to write instead.
+- **One executor for every environment.** Environment profiles map each environment to its Blindata tenant, credentials and connection; one agent can serve them all.
+- **API key or OAuth2.** The same authentication options as the Blindata observer, including Microsoft Entra ID service principals (secret or certificate).
+- **Stateless.** No database: everything travels in the run id and in the agent job. Run any number of replicas.
+- **A fallback without the executor.** A small script runs the same check from the last stage of the provisioning pipeline.
 
-The image runs a **native** executable on port **9080**. Build the native binary first (Mandrel/GraalVM locally, or a container build):
+## Get started
 
-```bash
-./mvnw package -DskipTests -Dnative -Dquarkus.native.container-build=true
-
-docker build -t odm-platform-adapter-devops-executor-starter .
-docker run --rm -p 9080:9080 odm-platform-adapter-devops-executor-starter
-```
-
-To run the native binary directly:
-
-```bash
-./target/odm-platform-adapter-devops-executor-starter-*-runner
-```
-
----
-
-## Executor API
-
-| Method | Path                               | Request                                                      | Response                                |
-| :----- | :--------------------------------- | :----------------------------------------------------------- | :-------------------------------------- |
-| `POST` | `/api/v2/up/executor/tasks/start`  | JSON body with `executorParameters` and `pipelineParameters` | `{ "providerRunId": "starter-<uuid>" }` |
-| `POST` | `/api/v2/up/executor/tasks/status` | `{ "executorParameters", "providerRunId" }`                  | `{ "providerRunId", "status" }`         |
-| `POST` | `/api/v2/up/executor/tasks/logs`   | `{ "executorParameters", "providerRunId" }`                  | `{ "content", "generatedAt" }`          |
-| `POST` | `/api/v2/up/executor/tasks/cancel` | `{ "executorParameters", "providerRunId" }`                  | empty **200**                           |
-
-`status` is one of `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELED`.
-
-`executorParameters` carries:
-
-- `repositoryKey`
-- `dataProductRepo`: `providerType`, `providerBaseUrl`, `externalIdentifier`, `name`, `ownerId`, `ownerType`, `remoteUrlHttp`, `defaultBranch`
-- `ref`: `name`, `type`
-- `pipelineIdentifier`
-
-Unknown JSON properties are ignored. No activity or task identifiers are required.
-
-| Condition                                              | Result                                       |
-| :----------------------------------------------------- | :------------------------------------------- |
-| Request without `executorParameters` (any endpoint)    | **400**, the body names `executorParameters` |
-| Request without `providerRunId` (status, logs, cancel) | **400**, the body names `providerRunId`      |
-| Unknown `providerRunId`                                | **404**                                      |
-| Cancel of a run that has already ended                 | **409**                                      |
-
----
-
-## Simulation
-
-Defaults (`executor.simulation` in `application.yaml`):
-
-| Property       | Default     |
-| :------------- | :---------- |
-| `run-duration` | `5s`        |
-| `outcome`      | `SUCCEEDED` |
-
-A run stays `RUNNING` until `startedAt` plus the planned duration, then reports the planned outcome.
-
-Two reserved pipeline parameters override those defaults for a single run. The starter reads them the way a pipeline reads its own inputs.
-
-| Parameter                 | Values                                                                                  |
-| :------------------------ | :-------------------------------------------------------------------------------------- |
-| `starter.outcome`         | `SUCCEEDED` or `FAILED`, case-insensitive. Any other value keeps the configured default |
-| `starter.durationSeconds` | A non-negative integer number of seconds. Any other value keeps the configured default  |
-
-**Logs.** The logs endpoint returns one block with the run id, repository name, `repositoryKey`, ref name and type, pipeline identifier, pipeline parameters as received, the **names** of request headers starting with `x-odm-` (never their values), the start and end times, and the outcome.
-
-**Logging.** Each call writes one info log line that contains only the provider run id. Header values, secret values and parameter values are never written to the process log.
-
----
-
-## DevOps configuration
-
-Declare the starter on the DevOps server (`application-dev.yml`, and the same shape in `application-test.yml`):
+1. **Write the contract** in the descriptor: [ODCS support](docs/reference/odcs-support.md) and [Contract rules](docs/reference/contract-rules.md).
+2. **Prepare Blindata**: a technical identity and an agent connection per environment, see [Blindata setup](docs/reference/blindata-setup.md).
+3. **Run the executor** with one profile per environment: [Build, run and deploy](docs/reference/build-and-run.md) and the [Configuration reference](docs/reference/configuration-reference.md).
+4. **Plug it into DevOps** and declare the task in the descriptor: [DevOps setup](docs/reference/devops-setup.md).
 
 ```yaml
-odm:
-  utility-plane:
-    executor-services:
-      starter:
-        address: http://localhost:9080
-        execution-mode: full-control
+# Descriptor: the deploy activity of one environment
+lifecycleInfo:
+  deploy-dev:
+    - name: provisioning
+      service: { $href: gitlab }
+    - name: verify-contract
+      service: { $href: blindata }
+      template: { definition: {} }
+      configurations:
+        params:
+          dataProductFqn: urn:dpds:acme:dataproducts:orders:1
+          environment: dev
+          activityName: deploy-dev
+          taskName: verify-contract
 ```
 
----
+## In depth
 
-## Contributing
+| Document | Contents |
+|:--|:--|
+| [Concepts](docs/reference/concepts.md) | Architecture, what happens on start, status, logs and cancel, verdict rules, statelessness, topology with one tenant per environment |
+| [ODCS support](docs/reference/odcs-support.md) | Where the contract lives in the descriptor, every supported ODCS construct (types, metrics, operators, units, SQL), platforms, what is not supported |
+| [Contract rules](docs/reference/contract-rules.md) | Which rules run, blocking flag, check codes and physical binding, what the agent cannot run, writing rules for deploy time |
+| [Blindata setup](docs/reference/blindata-setup.md) | Technical identity (API key or OAuth2 / Entra ID), roles, agent connection per tenant |
+| [DevOps setup](docs/reference/devops-setup.md) | Registering the executor, declaring the task, results in DevOps, gating the next stage |
+| [Configuration reference](docs/reference/configuration-reference.md) | Every property, default, environment variable and validation rule |
+| [API reference](docs/reference/api-reference.md) | The four executor endpoints, payloads, errors, the report format |
+| [Build, run and deploy](docs/reference/build-and-run.md) | Maven and Docker builds, profiles file, tests, local end-to-end run |
+| [Fallback without the executor](docs/reference/fallback.md) | Running the same check from the provisioning pipeline |
+| [Troubleshooting](docs/reference/troubleshooting.md) | Common errors and what they mean |
+| [Internals](docs/reference/internals.md) | For contributors: code layout, how the descriptor and its ODCS contract are parsed (parser library, ODCS plugin, visitors), the job's wire format |
 
-Contributions are welcome.
-
-1. Fork the repository and create a feature branch
-2. Make your changes with clear commits
-3. Open a pull request against the main branch
-
-Bugs, questions, or proposals → [open an issue](https://github.com/opendatamesh-initiative/odm-platform-adapter-devops-executor-starter/issues).
-
----
-
-## License
-
-Licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
-
-Part of the [Open Data Mesh Initiative](https://github.com/opendatamesh-initiative).
+Design notes: [`spdd/analysis`](spdd/analysis).

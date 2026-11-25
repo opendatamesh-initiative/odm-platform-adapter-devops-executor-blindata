@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.opendatamesh</groupId>
-    <artifactId>odm-platform-adapter-devops-executor-starter</artifactId>
-    <version>2.0.0</version>
-    <name>executor-starter</name>
-    <description>Reference implementation of the DevOps executor v2 API</description>
+    <artifactId>odm-platform-adapter-devops-executor-blindata</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <name>executor-blindata</name>
+    <description>DevOps executor that verifies the data contract of a data product version on the Blindata agent</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -19,9 +19,17 @@
         <quarkus.platform.version>3.40.1</quarkus.platform.version>
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
-        <hibernate-jpamodelgen.version>6.4.1.Final</hibernate-jpamodelgen.version>
         <java-jwt.version>3.18.2</java-jwt.version>
+        <odm.dpds.parser.version>2.4.0</odm.dpds.parser.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>odm-spec-parser-repo</id>
+            <name>GitHub Packages for ODM Specification Parser</name>
+            <url>https://maven.pkg.github.com/opendatamesh-initiative/odm-specification-dpdescriptor-parser</url>
+        </repository>
+    </repositories>
 
     <dependencyManagement>
         <dependencies>
@@ -36,26 +44,46 @@
     </dependencyManagement>
 
     <dependencies>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-jackson</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-orm</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jdbc-postgresql</artifactId>
-        </dependency>
+        <!-- core: CDI container, and the jakarta.ws.rs API that the shared exceptions reference -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
         </dependency>
         <!-- core: utils.services.programmatic.AsyncExecutorServiceImpl (@VirtualThreads executor) -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-virtual-threads</artifactId>
+        </dependency>
+        <!-- utils.rest.CorrelationIdFilter -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest</artifactId>
+        </dependency>
+        <!-- utils.client (ObjectMapper) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jackson</artifactId>
+        </dependency>
+        <!-- utils.client.AuthenticatedRestUtilsTemplate -->
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>${java-jwt.version}</version>
+        </dependency>
+        <!-- service: ODM data product descriptor parser (descriptor model, datastore API, visitors) -->
+        <dependency>
+            <groupId>org.opendatamesh</groupId>
+            <artifactId>odm-specification-dpdescriptor-parser</artifactId>
+            <version>${odm.dpds.parser.version}</version>
+        </dependency>
+        <!-- service: REST resources with Jackson, YAML configuration, OpenAPI -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -63,22 +91,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-validator</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-narayana-jta</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.hibernate.orm</groupId>
-            <artifactId>hibernate-jpamodelgen</artifactId>
-            <version>${hibernate-jpamodelgen.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.auth0</groupId>
-            <artifactId>java-jwt</artifactId>
-            <version>${java-jwt.version}</version>
+            <artifactId>quarkus-smallrye-openapi</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -99,13 +112,6 @@
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.platform.version}</version>
                 <extensions>true</extensions>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.hibernate.orm</groupId>
-                        <artifactId>hibernate-jpamodelgen</artifactId>
-                        <version>${hibernate-jpamodelgen.version}</version>
-                    </dependency>
-                </dependencies>
                 <executions>
                     <execution>
                         <goals>
@@ -122,19 +128,36 @@
                 <configuration>
                     <release>21</release>
                     <parameters>true</parameters>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.hibernate.orm</groupId>
-                            <artifactId>hibernate-jpamodelgen</artifactId>
-                            <version>${hibernate-jpamodelgen.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <systemPropertyVariables>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <maven.home>${maven.home}</maven.home>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <!-- *IT: @QuarkusTest against the running application, in the integration-test phase. -->
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${surefire-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <!-- Run on the compiled classes, as @QuarkusTest expects, not on the packaged jar. -->
+                    <classesDirectory>${project.build.outputDirectory}</classesDirectory>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
@@ -169,8 +192,7 @@
                 <repository>
                     <id>github</id>
                     <name>GitHub Packages</name>
-                    <url>https://maven.pkg.github.com/opendatamesh-initiative/odm-platform-adapter-devops-executor-starter
-                    </url>
+                    <url>https://maven.pkg.github.com/opendatamesh-initiative/odm-platform-adapter-devops-executor-blindata</url>
                 </repository>
             </distributionManagement>
         </profile>
