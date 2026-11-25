@@ -6,7 +6,7 @@
 
     <groupId>org.opendatamesh</groupId>
     <artifactId>odm-platform-adapter-devops-executor-blindata</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>executor-blindata</name>
     <description>DevOps executor that verifies the data contract of a data product version on the Blindata agent</description>
 
