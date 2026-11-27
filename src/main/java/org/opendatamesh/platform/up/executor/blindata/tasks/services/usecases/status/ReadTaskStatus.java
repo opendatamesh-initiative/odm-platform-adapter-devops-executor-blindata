@@ -4,6 +4,9 @@ import org.opendatamesh.platform.up.executor.blindata.tasks.model.AgentRun;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.ContractVerdict;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.EnvironmentProfile;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.ProviderRunId;
+import org.opendatamesh.platform.up.executor.blindata.tasks.model.ReportSummary;
+import org.opendatamesh.platform.up.executor.blindata.tasks.model.RuleOutcome;
+import org.opendatamesh.platform.up.executor.blindata.tasks.model.RuleReport;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.RunStatus;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.VerificationReport;
 import org.opendatamesh.platform.up.executor.blindata.utils.usecases.UseCase;
@@ -45,11 +48,34 @@ class ReadTaskStatus implements UseCase {
             AgentRun run = readRun(findProfile(runId), runId);
             VerificationReport report = ContractVerdict.evaluate(run);
             if (report.verdict().isTerminal()) {
+                logVerdict(runId, report);
                 publishReport(report);
+            } else {
+                logger.debug("Run {} still running (agent status {})", runId.value(), run.rawStatus());
             }
             presenter.presentStatus(runId.value(), report.verdict());
         } catch (Exception e) {
             presenter.presentException(e);
+        }
+    }
+
+    private static void logVerdict(ProviderRunId runId, VerificationReport report) {
+        ReportSummary summary = report.summary();
+        logger.info("Run {} of {} {} ended {} (agent status {}): {} rules, {} passed, {} failed, {} error, {} skipped, "
+                        + "{} blocking failed or errored",
+                runId.value(), report.context().dataProductFqn(), report.context().dataProductVersion(), report.verdict(),
+                report.agentRunStatus(), summary.total(), summary.passed(), summary.failed(), summary.error(),
+                summary.skipped(), summary.failedBlocking());
+        for (String note : report.notes()) {
+            logger.info("Run {}: {}", runId.value(), note);
+        }
+        for (RuleReport rule : report.rules()) {
+            if (rule.outcome() == RuleOutcome.ERROR) {
+                logger.warn("Run {}: rule {} ({}) errored: {}", runId.value(), rule.ruleId(), rule.port(), rule.error());
+            } else if (rule.outcome() == RuleOutcome.FAILED) {
+                logger.info("Run {}: rule {} ({}) failed{}", runId.value(), rule.ruleId(), rule.port(),
+                        rule.blocking() ? " (blocking)" : "");
+            }
         }
     }
 
@@ -88,6 +114,7 @@ class ReadTaskStatus implements UseCase {
         }
         try {
             resultsPort.publish(report);
+            logger.info("Report of job {} posted to DevOps", report.sequenceId());
         } catch (Exception e) {
             logger.warn("Report of job {} not posted to DevOps, it stays in the task logs: {}", report.sequenceId(), e.getMessage());
         }

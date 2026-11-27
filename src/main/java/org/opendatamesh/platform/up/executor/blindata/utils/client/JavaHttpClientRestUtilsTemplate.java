@@ -3,6 +3,7 @@ package org.opendatamesh.platform.up.executor.blindata.utils.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientException;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientTransportException;
 import org.opendatamesh.platform.up.executor.blindata.utils.client.http.HttpEntity;
 import org.opendatamesh.platform.up.executor.blindata.utils.client.http.HttpHeader;
 import org.opendatamesh.platform.up.executor.blindata.utils.client.http.HttpMethod;
@@ -26,19 +27,27 @@ import java.util.Map;
 class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
 
     private final HttpClient httpClient;
+    private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(60);
+
     private final ObjectMapper objectMapper;
+    private final Duration requestTimeout;
     private List<HttpHeader> authenticatedHeaders;
     private Oauth2 oauth2;
     private String asyncEndpointRequest;
     private String asyncEndpointPoll;
 
-    private JavaHttpClientRestUtilsTemplate(HttpClient httpClient, ObjectMapper objectMapper) {
+    private JavaHttpClientRestUtilsTemplate(HttpClient httpClient, ObjectMapper objectMapper, Duration requestTimeout) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
+        this.requestTimeout = requestTimeout;
     }
 
     static JavaHttpClientRestUtilsTemplate wrap(HttpClient httpClient, ObjectMapper objectMapper) {
-        return new JavaHttpClientRestUtilsTemplate(httpClient, objectMapper);
+        return wrap(httpClient, objectMapper, DEFAULT_REQUEST_TIMEOUT);
+    }
+
+    static JavaHttpClientRestUtilsTemplate wrap(HttpClient httpClient, ObjectMapper objectMapper, Duration requestTimeout) {
+        return new JavaHttpClientRestUtilsTemplate(httpClient, objectMapper, requestTimeout);
     }
 
     JavaHttpClientRestUtilsTemplate authenticate(List<HttpHeader> authenticatedHeaders, Oauth2 oauth2) {
@@ -78,7 +87,7 @@ class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
         try {
             HttpEntity<?> entity = new HttpEntity<>(resource, httpHeaders);
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(60))
+                    .timeout(requestTimeout)
                     .method(HttpMethod.POST.name(), bodyPublisher(entity));
             applyHeaders(builder, entity);
             HttpResponse<byte[]> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
@@ -94,9 +103,9 @@ class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ClientException(500, e.getMessage());
+            throw new ClientTransportException("interrupted", e);
         } catch (IOException e) {
-            throw new ClientException(500, e.getMessage());
+            throw new ClientTransportException(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
         }
     }
 
@@ -104,7 +113,7 @@ class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
             throws ClientException {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(60))
+                    .timeout(requestTimeout)
                     .method(method.name(), bodyPublisher(requestEntity));
             applyHeaders(builder, requestEntity);
 
@@ -116,17 +125,21 @@ class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
             if (responseType == null || body.length == 0 || Void.class.equals(responseType) || void.class.equals(responseType)) {
                 return null;
             }
-            if (JsonNode.class.equals(responseType)) {
-                return responseType.cast(objectMapper.readTree(body));
+            try {
+                if (JsonNode.class.equals(responseType)) {
+                    return responseType.cast(objectMapper.readTree(body));
+                }
+                return objectMapper.readValue(body, responseType);
+            } catch (IOException unreadable) {
+                throw new ClientException(response.statusCode(), "Unreadable response: " + unreadable.getMessage());
             }
-            return objectMapper.readValue(body, responseType);
         } catch (ClientException e) {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ClientException(500, e.getMessage());
+            throw new ClientTransportException("interrupted", e);
         } catch (IOException e) {
-            throw new ClientException(500, e.getMessage());
+            throw new ClientTransportException(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
         }
     }
 

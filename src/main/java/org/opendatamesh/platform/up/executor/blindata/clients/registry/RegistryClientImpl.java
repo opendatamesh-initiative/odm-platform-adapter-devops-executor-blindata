@@ -8,6 +8,8 @@ import org.opendatamesh.platform.up.executor.blindata.config.BlindataProperties;
 import org.opendatamesh.platform.up.executor.blindata.config.OdmServicesProperties;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.BadGatewayException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientException;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientFailures;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientTransportException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientResourceMappingException;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.DataProductVersionDescriptor;
 import org.opendatamesh.platform.up.executor.blindata.utils.client.RestUtils;
@@ -113,8 +115,8 @@ public class RegistryClientImpl implements RegistryClient {
                     return Optional.empty();
                 }
                 if (!isRetryable(e) || attempt >= readRetries) {
-                    throw new BadGatewayException("ODM Registry failed to " + action + ": HTTP " + e.getCode()
-                            + excerpt(e.getResponseBody()), e);
+                    throw new BadGatewayException("ODM Registry failed to " + action
+                            + ClientFailures.describe(e, MAX_ERROR_CHARS), e);
                 }
                 attempt++;
                 logger.warn("ODM Registry call failed with HTTP {}, retry {} of {}", e.getCode(), attempt, readRetries);
@@ -125,6 +127,9 @@ public class RegistryClientImpl implements RegistryClient {
     }
 
     private static boolean isRetryable(ClientException e) {
+        if (e instanceof ClientTransportException transport && transport.isInterrupted()) {
+            return false;
+        }
         return e.getCode() >= 500 || e.getCode() == 429;
     }
 
@@ -145,13 +150,6 @@ public class RegistryClientImpl implements RegistryClient {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
-    private static String excerpt(String body) {
-        if (body == null || body.isBlank()) {
-            return "";
-        }
-        String trimmed = body.strip();
-        return ": " + (trimmed.length() > MAX_ERROR_CHARS ? trimmed.substring(0, MAX_ERROR_CHARS) + "…" : trimmed);
-    }
 
     private static String trimTrailingSlash(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;

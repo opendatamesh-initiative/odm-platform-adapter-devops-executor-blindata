@@ -53,7 +53,7 @@ Skipped rules:
 
 ## Errors
 
-Errors are plain-text messages that DevOps shows on the task. They never contain credentials.
+Errors are plain-text messages that DevOps records in the task logs. They never contain credentials.
 
 | Status | When |
 |:--|:--|

@@ -10,6 +10,7 @@ import org.opendatamesh.platform.up.executor.blindata.config.OdmServicesProperti
 import org.opendatamesh.platform.up.executor.blindata.exceptions.BadGatewayException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.InternalException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientException;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientFailures;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientResourceMappingException;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.VerificationReport;
 import org.opendatamesh.platform.up.executor.blindata.utils.client.RestUtils;
@@ -53,7 +54,7 @@ public class DevOpsClientImpl implements DevOpsClient {
             rest.genericPost(baseUrl + TASK_RESULTS, null, command(report), JsonNode.class);
         } catch (ClientException e) {
             throw new BadGatewayException("ODM DevOps refused the results of task " + report.context().taskName()
-                    + " of activity " + report.context().activityName() + ": HTTP " + e.getCode() + excerpt(e.getResponseBody()), e);
+                    + " of activity " + report.context().activityName() + ClientFailures.describe(e, MAX_ERROR_CHARS), e);
         } catch (ClientResourceMappingException e) {
             throw new BadGatewayException("ODM DevOps returned an unreadable response to the results post", e);
         }
@@ -79,13 +80,6 @@ public class DevOpsClientImpl implements DevOpsClient {
         }
     }
 
-    private static String excerpt(String body) {
-        if (body == null || body.isBlank()) {
-            return "";
-        }
-        String trimmed = body.strip();
-        return ": " + (trimmed.length() > MAX_ERROR_CHARS ? trimmed.substring(0, MAX_ERROR_CHARS) + "…" : trimmed);
-    }
 
     private static String trimTrailingSlash(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
