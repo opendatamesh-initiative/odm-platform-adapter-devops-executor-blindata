@@ -14,7 +14,7 @@ public final class ClientFailures {
         if (e instanceof ClientTransportException transport) {
             String kind = transport.isInterrupted() ? "interrupted before an answer came back"
                     : transport.isResponseTimeout() ? "no answer in time" : "no connection";
-            String detail = excerpt(transport.getResponseBody(), maxBodyChars);
+            String detail = transport.isInterrupted() ? "" : excerpt(transport.getResponseBody(), maxBodyChars);
             return ": " + kind + (detail.isEmpty() ? "" : " (" + detail + ")");
         }
         String body = excerpt(e.getResponseBody(), maxBodyChars);

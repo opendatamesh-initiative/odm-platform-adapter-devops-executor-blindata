@@ -28,6 +28,10 @@ public class ClientTransportException extends ClientException {
 
     @Override
     public String getMessage() {
-        return "no HTTP response: " + getResponseBody();
+        String detail = getResponseBody();
+        if (detail == null || detail.isBlank()) {
+            detail = getCause() == null ? "unknown cause" : getCause().getClass().getSimpleName();
+        }
+        return "no HTTP response: " + detail;
     }
 }

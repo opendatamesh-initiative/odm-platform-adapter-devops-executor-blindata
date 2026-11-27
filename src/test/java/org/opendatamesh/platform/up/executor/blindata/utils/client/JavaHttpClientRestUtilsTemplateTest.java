@@ -96,10 +96,13 @@ class JavaHttpClientRestUtilsTemplateTest {
 
     @Test
     void whenInterruptedThenWordedAsInterruptedNotAsNetwork() {
-        ClientTransportException interrupted = new ClientTransportException("", new InterruptedException());
+        ClientTransportException interrupted = new ClientTransportException("interrupted", new InterruptedException());
 
         assertTrue(interrupted.isInterrupted());
         assertEquals(": interrupted before an answer came back", ClientFailures.describe(interrupted, 300));
+        assertEquals("no HTTP response: interrupted", interrupted.getMessage());
+        assertEquals("no HTTP response: InterruptedException",
+                new ClientTransportException("", new InterruptedException()).getMessage());
     }
 
     @Test

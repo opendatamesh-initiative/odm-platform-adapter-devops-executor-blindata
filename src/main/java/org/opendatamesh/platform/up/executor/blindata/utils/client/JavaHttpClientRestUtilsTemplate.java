@@ -103,7 +103,7 @@ class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ClientTransportException("", e);
+            throw new ClientTransportException("interrupted", e);
         } catch (IOException e) {
             throw new ClientTransportException(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
         }
@@ -137,7 +137,7 @@ class JavaHttpClientRestUtilsTemplate implements RestUtilsTemplate {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ClientTransportException("", e);
+            throw new ClientTransportException("interrupted", e);
         } catch (IOException e) {
             throw new ClientTransportException(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
         }
