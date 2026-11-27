@@ -9,6 +9,7 @@ import org.opendatamesh.platform.up.executor.blindata.config.OdmServicesProperti
 import org.opendatamesh.platform.up.executor.blindata.exceptions.BadGatewayException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientFailures;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientTransportException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientResourceMappingException;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.DataProductVersionDescriptor;
 import org.opendatamesh.platform.up.executor.blindata.utils.client.RestUtils;
@@ -126,6 +127,9 @@ public class RegistryClientImpl implements RegistryClient {
     }
 
     private static boolean isRetryable(ClientException e) {
+        if (e instanceof ClientTransportException transport && transport.isInterrupted()) {
+            return false;
+        }
         return e.getCode() >= 500 || e.getCode() == 429;
     }
 

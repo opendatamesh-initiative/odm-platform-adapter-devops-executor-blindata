@@ -6,10 +6,14 @@ public final class ClientFailures {
     private ClientFailures() {
     }
 
-    /** {@code ": HTTP 404: <body>"}, {@code ": no connection (<error>)"} or {@code ": no answer in time (<error>)"}. */
+    /**
+     * {@code ": HTTP 404: <body>"}, {@code ": no connection (<error>)"}, {@code ": no answer in time (<error>)"} or
+     * {@code ": interrupted before an answer came back"}.
+     */
     public static String describe(ClientException e, int maxBodyChars) {
         if (e instanceof ClientTransportException transport) {
-            String kind = transport.isResponseTimeout() ? "no answer in time" : "no connection";
+            String kind = transport.isInterrupted() ? "interrupted before an answer came back"
+                    : transport.isResponseTimeout() ? "no answer in time" : "no connection";
             String detail = excerpt(transport.getResponseBody(), maxBodyChars);
             return ": " + kind + (detail.isEmpty() ? "" : " (" + detail + ")");
         }

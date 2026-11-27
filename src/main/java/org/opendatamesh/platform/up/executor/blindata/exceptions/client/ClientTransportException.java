@@ -20,4 +20,14 @@ public class ClientTransportException extends ClientException {
     public boolean isResponseTimeout() {
         return getCause() instanceof HttpTimeoutException && !(getCause() instanceof HttpConnectTimeoutException);
     }
+
+    /** True when this service stopped waiting because its thread was interrupted (e.g. shutdown), not the network. */
+    public boolean isInterrupted() {
+        return getCause() instanceof InterruptedException;
+    }
+
+    @Override
+    public String getMessage() {
+        return "no HTTP response: " + getResponseBody();
+    }
 }

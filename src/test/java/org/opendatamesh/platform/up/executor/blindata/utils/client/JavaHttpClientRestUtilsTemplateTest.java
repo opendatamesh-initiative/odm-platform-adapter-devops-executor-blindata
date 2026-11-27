@@ -94,6 +94,23 @@ class JavaHttpClientRestUtilsTemplateTest {
         assertTrue(failure.getResponseBody().startsWith("Unreadable response"));
     }
 
+    @Test
+    void whenInterruptedThenWordedAsInterruptedNotAsNetwork() {
+        ClientTransportException interrupted = new ClientTransportException("", new InterruptedException());
+
+        assertTrue(interrupted.isInterrupted());
+        assertEquals(": interrupted before an answer came back", ClientFailures.describe(interrupted, 300));
+    }
+
+    @Test
+    void transportFailureMessageDoesNotClaimHttp500() {
+        ClientTransportException failure = new ClientTransportException("HTTP connect timed out",
+                new java.net.http.HttpConnectTimeoutException("HTTP connect timed out"));
+
+        assertEquals("no HTTP response: HTTP connect timed out", failure.getMessage());
+        assertEquals(": no connection (HTTP connect timed out)", ClientFailures.describe(failure, 300));
+    }
+
     private JsonNode post(String url) {
         return template(Duration.ofSeconds(5)).exchange(url, HttpMethod.POST, new HttpEntity<>("{}", List.of()), JsonNode.class, Map.of());
     }

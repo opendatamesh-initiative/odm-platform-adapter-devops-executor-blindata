@@ -166,6 +166,9 @@ public class AgentClientImpl implements AgentClient {
     }
 
     private static boolean isRetryable(ClientException e) {
+        if (e instanceof ClientTransportException transport && transport.isInterrupted()) {
+            return false;
+        }
         return e.getCode() >= 500 || e.getCode() == 429;
     }
 
