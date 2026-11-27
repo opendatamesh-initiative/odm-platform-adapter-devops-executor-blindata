@@ -6,6 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.opendatamesh.platform.up.executor.blindata.config.BlindataProperties;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.BadGatewayException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientException;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientFailures;
+import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientTransportException;
 import org.opendatamesh.platform.up.executor.blindata.exceptions.client.ClientResourceMappingException;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.AgentRun;
 import org.opendatamesh.platform.up.executor.blindata.tasks.model.BlindataCredentials;
@@ -156,7 +158,11 @@ public class AgentClientImpl implements AgentClient {
             return new BadGatewayException(agent + " refused the credentials of the environment profile (HTTP " + e.getCode()
                     + ") when trying to " + action, e);
         }
-        return new BadGatewayException(agent + " failed to " + action + ": HTTP " + e.getCode() + excerpt(e.getResponseBody()), e);
+        String sentence = agent + " failed to " + action + ClientFailures.describe(e, MAX_ERROR_CHARS);
+        if (e instanceof ClientTransportException transport && transport.isResponseTimeout() && action.startsWith("start")) {
+            sentence += ". The job may have started on the agent anyway";
+        }
+        return new BadGatewayException(sentence, e);
     }
 
     private static boolean isRetryable(ClientException e) {
@@ -177,11 +183,4 @@ public class AgentClientImpl implements AgentClient {
         return log.replace("\r\n", "\n").replace('\r', '\n');
     }
 
-    private static String excerpt(String body) {
-        if (body == null || body.isBlank()) {
-            return "";
-        }
-        String trimmed = body.strip();
-        return ": " + (trimmed.length() > MAX_ERROR_CHARS ? trimmed.substring(0, MAX_ERROR_CHARS) + "…" : trimmed);
-    }
 }
