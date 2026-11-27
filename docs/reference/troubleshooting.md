@@ -1,5 +1,10 @@
 # Troubleshooting
 
+Where to look when a task fails:
+
+- **Task logs in DevOps.** When the start fails, DevOps (from the release that records executor errors) stores the executor's error message, with its HTTP status, as the task log. When the run ends, the log holds the verification report and the agent job log.
+- **Executor service log.** Every refused request is logged at `WARN` with the endpoint and the message, and an unexpected failure at `ERROR` with its stack trace. Each start, skipped rule, and verdict (with rule counts and errored rules) is logged at `INFO`. Set `quarkus.log.category."org.opendatamesh.platform.up.executor.blindata".level` to `DEBUG` to also trace each call to the Blindata agent.
+
 | Symptom | Cause and fix |
 |:--|:--|
 | The service does not start: `<key>: required` or `must be ...` | Invalid configuration; the message names the key. See the [Configuration reference](configuration-reference.md). |

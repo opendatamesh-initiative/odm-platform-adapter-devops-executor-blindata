@@ -65,6 +65,7 @@ public class AgentClientImpl implements AgentClient {
 
     @Override
     public long launch(EnvironmentProfile profile, ContractJob job) {
+        logger.debug("Launching job on the Blindata agent of environment {}: {} rules", profile.name(), job.rules().size());
         try {
             JsonNode history = rest(profile).genericPost(profile.agentUrl() + RUN_ASYNC, null, mapper.toJob(job), JsonNode.class);
             JsonNode sequenceId = history == null ? null : history.get("sequenceId");
@@ -99,9 +100,11 @@ public class AgentClientImpl implements AgentClient {
         int attempt = 0;
         while (true) {
             try {
+                logger.debug("Blindata agent of environment {}: {}", profile.name(), action);
                 return Optional.ofNullable(rest(profile).genericGet(profile.agentUrl() + path, null, null, JsonNode.class));
             } catch (ClientException e) {
                 if (e.getCode() == HTTP_NOT_FOUND) {
+                    logger.debug("Blindata agent of environment {} answered 404 when trying to {}", profile.name(), action);
                     return Optional.empty();
                 }
                 if (!isRetryable(e) || attempt >= retries) {

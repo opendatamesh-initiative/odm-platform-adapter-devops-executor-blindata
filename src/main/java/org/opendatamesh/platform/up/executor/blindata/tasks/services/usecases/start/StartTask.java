@@ -48,10 +48,14 @@ class StartTask implements UseCase {
     @Override
     public void execute() {
         try {
+            logger.info("Start requested: data product {} version {} tag {} in environment {} (activity {}, task {})",
+                    command.dataProductFqn(), command.dataProductVersion(), command.versionTag(), command.environment(),
+                    command.activityName(), command.taskName());
             validateCommand();
             EnvironmentProfile profile = findProfile();
             DataProductVersionDescriptor version = findVersion();
             ContractJob job = planJob(profile, version, rulesPort.readRules(version));
+            logSkipped(job);
             long sequenceId = agentPort.launch(profile, job);
             logger.info("Started contract verification job {} of {} {} in environment {}: {} rules, {} skipped",
                     sequenceId, version.dataProductFqn(), version.versionNumber(), profile.name(),
@@ -59,6 +63,12 @@ class StartTask implements UseCase {
             presenter.presentStarted(new ProviderRunId(profile.name(), sequenceId));
         } catch (Exception e) {
             presenter.presentException(e);
+        }
+    }
+
+    private static void logSkipped(ContractJob job) {
+        for (SkippedRule skipped : job.skipped()) {
+            logger.info("Rule {} skipped: {}", skipped.ruleId(), skipped.reason());
         }
     }
 

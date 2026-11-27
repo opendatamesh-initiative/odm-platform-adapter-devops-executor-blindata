@@ -44,6 +44,7 @@ class ReadTaskLogs implements UseCase {
             EnvironmentProfile profile = findProfile(runId);
             AgentRun run = readRun(profile, runId);
             String content = rendererPort.render(ContractVerdict.evaluate(run), agentLog(profile, runId));
+            logger.debug("Logs of run {} read: {} characters", runId.value(), content.length());
             presenter.presentLogs(content, Instant.now());
         } catch (Exception e) {
             presenter.presentException(e);
